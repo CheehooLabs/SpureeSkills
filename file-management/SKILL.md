@@ -351,14 +351,27 @@ curl -X DELETE "https://data.spuree.com/api/v1/files/{fileId}" \
 
 S3 key: `works_{workspaceId}/sess_{sessionId}/file_{fileId}`
 
-### Studio URLs
+### Studio URLs (share / preview)
 
 | Resource | URL Pattern |
 | --- | --- |
 | Project | `https://studio.spuree.com/projects/{projectId}` |
 | Folder (top-level) | `https://studio.spuree.com/projects/{projectId}/folders/{folderId}` |
 | Folder (nested) | `.../folders/{parentId}/{childId}` (up to 5 levels) |
-| File | `https://studio.spuree.com/file/{fileId}` |
+| File (preview page) | `https://studio.spuree.com/file/{fileId}` |
+
+The **File** URL is also the preview page — Studio renders images, video, 3D, and other supported formats inline. It's the link to share when a user asks for "the file".
+
+### File Preview & Sharing Links
+
+Two kinds of URLs for a file — pick by use case:
+
+| Use case | URL | Properties |
+| --- | --- | --- |
+| **Share with user / preview in Studio** | `https://studio.spuree.com/file/{fileId}` | Permanent, permission-aware, renders preview UI. Return this whenever the user asks for "a link to the file". |
+| **Programmatic download** | `downloadUrl` from `GET /v1/files/{fileId}` | Short-lived presigned S3 URL. Do not share — it bypasses permissions and expires. |
+
+**Rule of thumb:** after `POST /v1/files` (upload) or `GET /v1/search`, build the Studio URL from the returned `fileId` and return that to the user. Only fetch `downloadUrl` when the agent itself needs the bytes.
 
 ## Error Handling
 
