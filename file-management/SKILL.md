@@ -339,6 +339,29 @@ curl -X DELETE "https://data.spuree.com/api/v1/files/{fileId}" \
 2. Upload new content to S3 (single or multipart, same as above)
 3. `POST /v1/files/{fileId}/upload/complete` — **REQUIRED**
 
+### Viewing / Previewing a File
+
+When a user wants to **view**, **preview**, or **see** a file:
+
+1. If the agent has browser tools (e.g., Chrome DevTools MCP), **open the Studio preview URL directly**:
+   ```
+   navigate_page → https://studio.spuree.com/file/{fileId}
+   ```
+
+2. Otherwise, **return the Studio preview URL** for the user to click:
+   ```
+   https://studio.spuree.com/file/{fileId}
+   ```
+
+Do **not** download the file or attempt to open it locally. The Studio URL is permanent, permission-aware, and renders images, video, 3D, and other supported formats inline in the browser.
+
+| Use case | URL | Properties |
+| --- | --- | --- |
+| **Share with user / preview** | `https://studio.spuree.com/file/{fileId}` | Permanent, permission-aware, renders preview UI |
+| **Programmatic download** | `downloadUrl` from `GET /v1/files/{fileId}` | Short-lived presigned S3 URL — do not share, bypasses permissions and expires |
+
+**Rule of thumb:** after `POST /v1/files` (upload) or `GET /v1/search`, build the Studio URL from the returned `fileId` and return that to the user. Only fetch `downloadUrl` when the agent itself needs the bytes.
+
 ### Search Then Download
 
 1. `GET /v1/search?q=hero_walk` → find file ID
@@ -351,27 +374,14 @@ curl -X DELETE "https://data.spuree.com/api/v1/files/{fileId}" \
 
 S3 key: `works_{workspaceId}/sess_{sessionId}/file_{fileId}`
 
-### Studio URLs (share / preview)
+### Studio URLs
 
 | Resource | URL Pattern |
 | --- | --- |
 | Project | `https://studio.spuree.com/projects/{projectId}` |
 | Folder (top-level) | `https://studio.spuree.com/projects/{projectId}/folders/{folderId}` |
 | Folder (nested) | `.../folders/{parentId}/{childId}` (up to 5 levels) |
-| File (preview page) | `https://studio.spuree.com/file/{fileId}` |
-
-The **File** URL is also the preview page — Studio renders images, video, 3D, and other supported formats inline. It's the link to share when a user asks for "the file".
-
-### File Preview & Sharing Links
-
-Two kinds of URLs for a file — pick by use case:
-
-| Use case | URL | Properties |
-| --- | --- | --- |
-| **Share with user / preview in Studio** | `https://studio.spuree.com/file/{fileId}` | Permanent, permission-aware, renders preview UI. Return this whenever the user asks for "a link to the file". |
-| **Programmatic download** | `downloadUrl` from `GET /v1/files/{fileId}` | Short-lived presigned S3 URL. Do not share — it bypasses permissions and expires. |
-
-**Rule of thumb:** after `POST /v1/files` (upload) or `GET /v1/search`, build the Studio URL from the returned `fileId` and return that to the user. Only fetch `downloadUrl` when the agent itself needs the bytes.
+| File | `https://studio.spuree.com/file/{fileId}` |
 
 ## Error Handling
 
