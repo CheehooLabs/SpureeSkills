@@ -74,6 +74,11 @@ Entities represent assets and have one of these types:
 
 ### POST /v1/sessions
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
 Create a new folder.
 
 **Description:** Creates a folder under a parent (project, folder, animation, or entity). The name must be compatible with Windows file system naming rules.
@@ -130,6 +135,11 @@ curl -X POST "https://data.spuree.com/api/v1/sessions" \
 ---
 
 ### PATCH /v1/sessions/{sessionId}
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
 
 Update a folder (rename, move, or edit tags).
 
@@ -196,6 +206,11 @@ curl -X PATCH "https://data.spuree.com/api/v1/sessions/64a7b8c9d1e2f3a4b5c6d7e8"
 
 ### DELETE /v1/sessions/{sessionId}
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
 Delete a folder (soft delete).
 
 **Description:** Soft-deletes a folder by setting its status to "deleted". Only folders (`sessionType: "session"`) can be deleted via this endpoint.
@@ -236,6 +251,11 @@ curl -X DELETE "https://data.spuree.com/api/v1/sessions/64a7b8c9d1e2f3a4b5c6d7e8
 ---
 
 ### GET /v1/sessions/{sessionId}/children
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
 
 Browse a folder's immediate contents.
 
@@ -353,6 +373,11 @@ curl "https://data.spuree.com/api/v1/sessions/64a7b8c9d1e2f3a4b5c6d7e8/children?
 
 ### GET /v1/sessions/{sessionId}/assets
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
 Get assets (entities) in a folder.
 
 **Description:** Returns entity sessions and their associated files for a given folder.
@@ -421,6 +446,11 @@ curl "https://data.spuree.com/api/v1/sessions/64a7b8c9d1e2f3a4b5c6d7e8/assets" \
 
 ### GET /v1/sessions/{sessionId}/files
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
 Get files in a folder.
 
 **Description:** Returns files associated with a folder. By default, flattens results to include files from sub-folders via entity session linkage.
@@ -488,6 +518,12 @@ curl "https://data.spuree.com/api/v1/sessions/64a7b8c9d1e2f3a4b5c6d7e8/files?fla
 ---
 
 ### POST /v1/sessions/files/download/urls
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend"]
+webSafe: false
+reason: "Returns short-lived S3/CloudFront download URLs that hosted web agents may not be able to fetch."
+-->
 
 Get download URLs for multiple files in bulk.
 

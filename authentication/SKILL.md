@@ -77,20 +77,20 @@ The agent should show you which projects you have access to. If it works, your A
 
 Spuree uses two hosts:
 
-| Host | Purpose | Endpoints |
-| --- | --- | --- |
+| Host                            | Purpose                                   | Endpoints                                                    |
+| ------------------------------- | ----------------------------------------- | ------------------------------------------------------------ |
 | `https://studio.spuree.com/api` | Authentication (login, refresh, exchange) | `/auth/token`, `/auth/token/refresh`, `/auth/token/exchange` |
-| `https://data.spuree.com/api` | All V1 data APIs (projects, files, etc.) | `/v1/projects`, `/v1/files`, `/v1/api-keys`, ... |
+| `https://data.spuree.com/api`   | All V1 data APIs (projects, files, etc.)  | `/v1/projects`, `/v1/files`, `/v1/api-keys`, ...             |
 
 All other skills in this repo use `https://data.spuree.com/api`. Only the token endpoints below use `studio.spuree.com`.
 
 ## Token Lifecycle
 
-| Token | Lifetime | Format |
-| --- | --- | --- |
-| `access_token` | 1 hour | NextAuth JWT |
-| `refresh_token` | 30 days | Opaque hex string |
-| `exchange_code` | 60 seconds | Opaque string |
+| Token           | Lifetime   | Format            |
+| --------------- | ---------- | ----------------- |
+| `access_token`  | 1 hour     | NextAuth JWT      |
+| `refresh_token` | 30 days    | Opaque hex string |
+| `exchange_code` | 60 seconds | Opaque string     |
 
 The `access_token` is what you pass as `Authorization: Bearer <access_token>` to V1 API endpoints.
 
@@ -127,34 +127,40 @@ All three endpoints return the same OAuth2-compliant response:
 
 ### POST /auth/token
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend"]
+webSafe: false
+reason: "Hosted web MCP clients use the connector OAuth flow instead of collecting passwords or issuing raw JWTs."
+-->
+
 Log in with email and password.
 
 **Description:** Validates credentials and returns an access token and refresh token. Rate limited to 10 requests per minute per IP.
 
 **Request Body:**
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `email` | string | Yes | User's email address |
-| `password` | string | Yes | User's password |
+| Field      | Type   | Required | Description          |
+| ---------- | ------ | -------- | -------------------- |
+| `email`    | string | Yes      | User's email address |
+| `password` | string | Yes      | User's password      |
 
 **Status Codes:**
 
-| Code | Description |
-| --- | --- |
-| 200 | Login successful, tokens returned |
-| 400 | Invalid request body or missing fields |
-| 401 | Invalid email or password, or account locked |
-| 429 | Rate limit exceeded (10 req/min) |
-| 500 | Internal server error |
+| Code | Description                                  |
+| ---- | -------------------------------------------- |
+| 200  | Login successful, tokens returned            |
+| 400  | Invalid request body or missing fields       |
+| 401  | Invalid email or password, or account locked |
+| 429  | Rate limit exceeded (10 req/min)             |
+| 500  | Internal server error                        |
 
 **Error Messages (401):**
 
-| Message | Cause |
-| --- | --- |
-| `Invalid email or password` | Wrong credentials |
-| `Password is not set for this user` | User registered via OAuth only |
-| `Account is temporarily locked...` | Too many failed attempts (5 failures → 15 min lock) |
+| Message                             | Cause                                               |
+| ----------------------------------- | --------------------------------------------------- |
+| `Invalid email or password`         | Wrong credentials                                   |
+| `Password is not set for this user` | User registered via OAuth only                      |
+| `Account is temporarily locked...`  | Too many failed attempts (5 failures → 15 min lock) |
 
 **Example:**
 
@@ -171,25 +177,31 @@ curl -X POST "https://studio.spuree.com/api/auth/token" \
 
 ### POST /auth/token/refresh
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend"]
+webSafe: false
+reason: "Hosted web MCP clients refresh through the connector OAuth flow, not an exposed token-refresh tool."
+-->
+
 Refresh an expired access token.
 
 **Description:** Exchanges a valid refresh token for a new access token and refresh token pair. The old refresh token is atomically revoked to prevent reuse. Rate limited to 10 requests per minute per IP.
 
 **Request Body:**
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `refresh_token` | string | Yes | The refresh token from a previous login or refresh |
+| Field           | Type   | Required | Description                                        |
+| --------------- | ------ | -------- | -------------------------------------------------- |
+| `refresh_token` | string | Yes      | The refresh token from a previous login or refresh |
 
 **Status Codes:**
 
-| Code | Description |
-| --- | --- |
-| 200 | New tokens issued |
-| 400 | Missing refresh token |
-| 401 | Invalid or expired refresh token |
-| 429 | Rate limit exceeded |
-| 500 | Internal server error |
+| Code | Description                      |
+| ---- | -------------------------------- |
+| 200  | New tokens issued                |
+| 400  | Missing refresh token            |
+| 401  | Invalid or expired refresh token |
+| 429  | Rate limit exceeded              |
+| 500  | Internal server error            |
 
 **Example:**
 
@@ -210,25 +222,31 @@ curl -X POST "https://studio.spuree.com/api/auth/token/refresh" \
 
 ### POST /auth/token/exchange
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend"]
+webSafe: false
+reason: "This is a local/browser login exchange flow and is not part of the hosted web MCP surface."
+-->
+
 Exchange an authorization code for tokens.
 
 **Description:** Exchanges a one-time authorization code for an access token and refresh token. Used by agents and desktop apps that authenticate via the browser (see Getting Started Option C). The login flow starts at `studio.spuree.com/auth/signin?source=api` — after the user completes login, the exchange code is delivered to the agent's local callback server. Rate limited to 10 requests per minute per IP.
 
 **Request Body:**
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `code` | string | Yes | The authorization exchange code |
+| Field  | Type   | Required | Description                     |
+| ------ | ------ | -------- | ------------------------------- |
+| `code` | string | Yes      | The authorization exchange code |
 
 **Status Codes:**
 
-| Code | Description |
-| --- | --- |
-| 200 | Tokens issued |
-| 400 | Missing exchange code |
-| 401 | Invalid or expired exchange code |
-| 429 | Rate limit exceeded |
-| 500 | Internal server error |
+| Code | Description                      |
+| ---- | -------------------------------- |
+| 200  | Tokens issued                    |
+| 400  | Missing exchange code            |
+| 401  | Invalid or expired exchange code |
+| 429  | Rate limit exceeded              |
+| 500  | Internal server error            |
 
 **Example:**
 
@@ -253,17 +271,23 @@ All V1 endpoints accept either `Authorization: Bearer <jwt>` or `X-API-Key: <api
 
 ### POST /v1/api-keys
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend"]
+webSafe: false
+reason: "Creating long-lived API keys is not exposed to hosted web MCP clients."
+-->
+
 Create a new API key.
 
 **Auth:** Requires JWT (Bearer token only, not API key).
 
 **Request Body:**
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `name` | string | Yes | Descriptive name for the key |
-| `scopes` | object | No | `{ "organizations": ["orgId1", ...] }` — restrict to specific orgs. Omit for all orgs. |
-| `expiresAt` | datetime | No | Expiration timestamp (ISO 8601). Omit for no expiry. |
+| Field       | Type     | Required | Description                                                                            |
+| ----------- | -------- | -------- | -------------------------------------------------------------------------------------- |
+| `name`      | string   | Yes      | Descriptive name for the key                                                           |
+| `scopes`    | object   | No       | `{ "organizations": ["orgId1", ...] }` — restrict to specific orgs. Omit for all orgs. |
+| `expiresAt` | datetime | No       | Expiration timestamp (ISO 8601). Omit for no expiry.                                   |
 
 **Response:**
 
@@ -298,6 +322,12 @@ curl -X POST "https://data.spuree.com/api/v1/api-keys" \
 
 ### GET /v1/api-keys
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend"]
+webSafe: false
+reason: "API key management is not exposed to hosted web MCP clients."
+-->
+
 List all active API keys for the authenticated user.
 
 **Auth:** Requires JWT (Bearer token only).
@@ -328,6 +358,12 @@ curl "https://data.spuree.com/api/v1/api-keys" \
 ---
 
 ### DELETE /v1/api-keys/{key_id}
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend"]
+webSafe: false
+reason: "API key management is not exposed to hosted web MCP clients."
+-->
 
 Revoke an API key (soft delete).
 
@@ -406,13 +442,13 @@ API keys don't expire by default (unless `expiresAt` is set) and don't need refr
 
 ## Error Handling
 
-| Error | Cause | Resolution |
-| --- | --- | --- |
-| 401 (invalid credentials) | Wrong email or password | Verify credentials |
-| 401 (account locked) | 5 failed login attempts | Wait 15 minutes, then retry |
-| 401 (invalid refresh token) | Token expired, revoked, or reused | Log in again with email/password |
-| 401 (invalid exchange code) | Code expired or already used | Request a new exchange code |
-| 429 (rate limit) | More than 10 requests/min from same IP | Wait and retry with backoff |
+| Error                       | Cause                                  | Resolution                       |
+| --------------------------- | -------------------------------------- | -------------------------------- |
+| 401 (invalid credentials)   | Wrong email or password                | Verify credentials               |
+| 401 (account locked)        | 5 failed login attempts                | Wait 15 minutes, then retry      |
+| 401 (invalid refresh token) | Token expired, revoked, or reused      | Log in again with email/password |
+| 401 (invalid exchange code) | Code expired or already used           | Request a new exchange code      |
+| 429 (rate limit)            | More than 10 requests/min from same IP | Wait and retry with backoff      |
 
 ## Rate Limits
 

@@ -49,6 +49,11 @@ Project
 
 ### GET /v1/projects
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
 List projects accessible to the authenticated user, with workspace/organization lookup tables.
 
 **Query Parameters:**
@@ -90,6 +95,11 @@ curl "https://data.spuree.com/api/v1/projects" \
 
 ### POST /v1/projects
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
 Create a new project. Name must be Windows filesystem-compatible.
 
 **Where to get `workspaceId`:** From auth response `user.workspaces[].workspaceId` or from `GET /v1/projects`.
@@ -120,6 +130,11 @@ curl -X POST "https://data.spuree.com/api/v1/projects" \
 
 ### PATCH /v1/projects/{projectId}
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
 Rename a project.
 
 | Field | Type | Required | Description |
@@ -139,6 +154,11 @@ curl -X PATCH "https://data.spuree.com/api/v1/projects/{projectId}" \
 
 ### DELETE /v1/projects/{projectId}
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
 Soft-delete a project.
 
 **Response:** `{ messageCode, message, projectId }`
@@ -151,6 +171,11 @@ curl -X DELETE "https://data.spuree.com/api/v1/projects/{projectId}" \
 ---
 
 ### GET /v1/projects/{projectId}/children
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
 
 Browse a project's immediate contents: folders, entities (assets), and files. Use **folder-management** skill's `GET /v1/sessions/{folderId}/children` to navigate deeper.
 
@@ -173,6 +198,11 @@ curl "https://data.spuree.com/api/v1/projects/{projectId}/children" \
 ---
 
 ### POST /v1/projects/{projectId}/share
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
 
 Share a project with another user. Behaves differently based on target's workspace membership:
 
@@ -202,6 +232,11 @@ curl -X POST "https://data.spuree.com/api/v1/projects/{projectId}/share" \
 
 ### DELETE /v1/projects/{projectId}/share/{email}
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
 Remove a user from a shared project. **Owner only.**
 
 **Response:** `{ messageCode, message, projectId }`
@@ -215,6 +250,11 @@ curl -X DELETE "https://data.spuree.com/api/v1/projects/{projectId}/share/{email
 
 ### GET /v1/projects/{projectId}/share
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
 List the project's sharing info. **Owner or shared user.**
 
 **Response:** `{ owner: "owner@example.com", sharedWith: ["..."] }`
@@ -227,6 +267,11 @@ curl "https://data.spuree.com/api/v1/projects/{projectId}/share" \
 ---
 
 ### POST /v1/projects/{projectId}/leave
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
 
 Leave a project shared with you. **Owner cannot leave.**
 

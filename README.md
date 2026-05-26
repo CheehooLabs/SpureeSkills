@@ -4,6 +4,28 @@ Spuree provides an agent-friendly cloud storage via a simple Project → Folder 
 
 These skills are structured API documentation for AI agent consumption. Each skill documents a specific API domain with endpoints, request/response schemas, and working examples.
 
+## Agent Surfaces
+
+Each endpoint may include a hidden `spuree-agent` metadata block that tells MCP hosts where the endpoint is safe to expose:
+
+```md
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+```
+
+Supported surfaces:
+
+| Surface | Meaning |
+| --- | --- |
+| `local` | Local CLI/agent runtimes that can access local files and follow returned URLs |
+| `desktop` | Desktop agent runtimes |
+| `backend` | Server-side automations |
+| `hosted-web` | Hosted web agents such as Claude Web connectors |
+
+Hosted web MCP clients should expose only endpoints with `hosted-web` in `surfaces` and `webSafe: true`. Endpoints that require local file bytes, direct S3 uploads, or fetching short-lived asset URLs should stay off the hosted-web surface unless there is a dedicated web-safe API.
+
 ## Installation
 
 ```bash
