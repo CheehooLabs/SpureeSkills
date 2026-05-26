@@ -63,6 +63,11 @@ https://data.spuree.com/api/v1/projects
 
 ### GET /v1/projects/invitations/pending
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
 List pending invitations for the current user.
 
 **Response:** `{ "invitations": [ InvitationObject, ... ] }`
@@ -75,6 +80,11 @@ curl "https://data.spuree.com/api/v1/projects/invitations/pending" \
 ---
 
 ### POST /v1/projects/invitations/{token}/accept
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
 
 Accept an invitation. The user is added to the project's `sharedWith` list and automatically joined to the workspace if not already a member.
 
@@ -104,6 +114,11 @@ curl -X POST "https://data.spuree.com/api/v1/projects/invitations/{token}/accept
 
 ### POST /v1/projects/invitations/{token}/decline
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
 Decline an invitation.
 
 **Response:** `{ "messageCode": "success", "projectId": "..." }`
@@ -116,6 +131,11 @@ curl -X POST "https://data.spuree.com/api/v1/projects/invitations/{token}/declin
 ---
 
 ### GET /v1/projects/{projectId}/invitations
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
 
 List all invitations for a project (all statuses).
 
@@ -132,6 +152,11 @@ curl "https://data.spuree.com/api/v1/projects/{projectId}/invitations" \
 
 ### DELETE /v1/projects/{projectId}/invitations/{invitationId}
 
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
 Cancel a pending invitation.
 
 **Authorization:** Project owner or original inviter.
@@ -146,6 +171,11 @@ curl -X DELETE "https://data.spuree.com/api/v1/projects/{projectId}/invitations/
 ---
 
 ### POST /v1/projects/{projectId}/invitations/{invitationId}/resend
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
 
 Resend an invitation — resets expiry to 7 days from now.
 
