@@ -251,25 +251,27 @@ Browse a folder's immediate contents.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `limit` | integer | 100 | Results per page (max: 500) |
-| `offset` | integer | 0 | Number of items to skip |
+| `sortBy` | string | `lastModified` | Sort key: `lastModified` \| `createdDate` \| `name` |
+| `sortOrder` | string | `desc` | Sort direction: `asc` \| `desc` |
+| `limit` | integer | 100 | Items in the unified list (max: 500) |
+| `offset` | integer | 0 | Number of items to skip in the unified list |
 
-**Response:**
+**Response:** `{ items: [...] }` — one flat array mixing sub-folders, entities, and files, sorted by the chosen key. Each item carries a `type` discriminator (`"session"`, `"entity"`, or `"file"`) that selects its fields. An empty folder returns `{ "items": [] }`.
 
 ```json
 {
-  "sessions": [
+  "items": [
     {
+      "type": "session",
       "id": "64a7b8c9d1e2f3a4b5c6d7e8",
       "name": "Sub-folder",
       "sessionType": "session",
       "status": "active",
       "createdAt": "2024-01-15T10:00:00Z",
       "updatedAt": "2024-01-15T10:00:00Z"
-    }
-  ],
-  "entities": [
+    },
     {
+      "type": "entity",
       "id": "64a7b8c9d1e2f3a4b5c6d7e9",
       "name": "Hero Character",
       "entityType": "character",
@@ -284,13 +286,13 @@ Browse a folder's immediate contents.
         "key": "previews/hero_high.jpg",
         "fileFormat": "jpg"
       }
-    }
-  ],
-  "files": [
+    },
     {
+      "type": "file",
       "id": "64a7b8c9d1e2f3a4b5c6d7ea",
-      "fileName": "reference_sheet",
+      "name": "reference_sheet",
       "fileFormat": "png",
+      "fileSize": 20480,
       "key": "works_abc/sess_def/file_ghi",
       "sourceCharacter": null,
       "presignedUrl": "https://s3.amazonaws.com/...",
@@ -300,15 +302,17 @@ Browse a folder's immediate contents.
 }
 ```
 
-**Children Types:**
+> **Parsing note:** Read the `items` array. **Do not** look for separate top-level `sessions`, `entities`, or `files` arrays — older deployments returned that shape, but the current API returns the unified `items` list, so a parser expecting the old shape sees an empty result and wrongly concludes the folder is empty. For backward compatibility, a robust parser can read `items` first and fall back to the legacy `sessions`/`entities`/`files` arrays only when `items` is absent.
 
-| Array | Contains | Description |
+**Item Types** (selected by `type`):
+
+| `type` | Contains | Description |
 | --- | --- | --- |
-| `sessions` | Folders | Sub-folders — navigate deeper with this same endpoint |
-| `entities` | Assets | Entity sessions with preview images |
-| `files` | Files | Files with presigned download URLs |
+| `session` | Folder | Sub-folder — navigate deeper with this same endpoint |
+| `entity` | Asset | Entity session with preview images |
+| `file` | File | File with a presigned download URL |
 
-**Entity Fields:**
+**Entity Item Fields** (`type: "entity"`):
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -319,13 +323,14 @@ Browse a folder's immediate contents.
 | `entityPreview` | object? | Low-res preview (`presignedUrl`, `key`, `fileFormat`) |
 | `highResEntityPreview` | object? | High-res preview |
 
-**File Fields:**
+**File Item Fields** (`type: "file"`):
 
 | Field | Type | Description |
 | --- | --- | --- |
 | `id` | string | File ObjectId |
-| `fileName` | string | File name (without extension) |
+| `name` | string | File name (without extension; mirrors the file's `fileName`) |
 | `fileFormat` | string | File extension (lowercase) |
+| `fileSize` | integer? | File size in bytes |
 | `key` | string | S3 object key |
 | `sourceCharacter` | string? | Associated character name |
 | `presignedUrl` | string | S3 presigned download URL |
@@ -559,13 +564,13 @@ curl -X POST "https://data.spuree.com/api/v1/sessions/files/download/urls" \
 1. **Get project children** (via **project-management** skill):
 
    ```
-   GET /v1/projects/{projectId}/children → { sessions, entities, files }
+   GET /v1/projects/{projectId}/children → { items: [...] }
    ```
 
 2. **Navigate into a folder:**
 
    ```
-   GET /v1/sessions/{folderId}/children → { sessions, entities, files }
+   GET /v1/sessions/{folderId}/children → { items: [...] }
    ```
 
 3. **Repeat** to go deeper into sub-folders.

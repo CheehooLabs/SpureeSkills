@@ -152,18 +152,53 @@ curl -X DELETE "https://data.spuree.com/api/v1/projects/{projectId}" \
 
 ### GET /v1/projects/{projectId}/children
 
-Browse a project's immediate contents: folders, entities (assets), and files. Use **folder-management** skill's `GET /v1/sessions/{folderId}/children` to navigate deeper.
+Browse a project's immediate contents — folders, entities (assets), and files — as a **single unified `items` list** sorted by the chosen key. Use **folder-management** skill's `GET /v1/sessions/{folderId}/children` to navigate deeper.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `limit` | integer | 100 | Results per category (max 500) |
-| `offset` | integer | 0 | Items to skip |
+| `sortBy` | string | `lastModified` | Sort key: `lastModified` \| `createdDate` \| `name` |
+| `sortOrder` | string | `desc` | Sort direction: `asc` \| `desc` |
+| `limit` | integer | 100 | Items in the unified list (max 500) |
+| `offset` | integer | 0 | Items to skip in the unified list |
 
-**Response:** `{ sessions: [...], entities: [...], files: [...] }`
+**Response:** `{ items: [...] }` — one flat array mixing folders, entities, and files. Each item carries a `type` discriminator (`"session"`, `"entity"`, or `"file"`) that selects its fields. An empty project returns `{ "items": [] }`.
 
-- `sessions` — folders (`sessionType: "session"`)
-- `entities` — assets with preview images (character, motion, prop, etc.)
-- `files` — files with presigned download URLs
+```json
+{
+  "items": [
+    {
+      "type": "file",
+      "id": "64a7b8c9d1e2f3a4b5c6d7ea",
+      "name": "GUIDE",
+      "fileFormat": "md",
+      "fileSize": 1024,
+      "key": "works_abc/sess_def/file_ghi",
+      "presignedUrl": "https://s3.amazonaws.com/..."
+    },
+    {
+      "type": "session",
+      "id": "64a7b8c9d1e2f3a4b5c6d7e8",
+      "name": "storyboard",
+      "sessionType": "session"
+    },
+    {
+      "type": "entity",
+      "id": "64a7b8c9d1e2f3a4b5c6d7e9",
+      "name": "Hero Character",
+      "entityType": "character",
+      "entityPreview": { "presignedUrl": "https://s3.amazonaws.com/...", "key": "...", "fileFormat": "jpg" }
+    }
+  ]
+}
+```
+
+| `type` | Meaning | Key fields |
+| --- | --- | --- |
+| `session` | Folder | `sessionType` (`"session"`), `parentSessions` — navigate deeper via folder-management |
+| `entity` | Asset | `entityType` (character, motion, prop, etc.), `entityPreview` (preview image) |
+| `file` | File | `name` (mirrors the file's `fileName`), `fileFormat`, `fileSize`, `key`, `presignedUrl` (download URL) |
+
+> **Parsing note:** Read the `items` array. **Do not** look for separate top-level `sessions`, `entities`, or `files` arrays — older deployments returned that shape, but the current API returns the unified `items` list, so a parser expecting the old shape sees an empty result and wrongly concludes the project is empty. For backward compatibility, a robust parser can read `items` first and fall back to the legacy `sessions`/`entities`/`files` arrays only when `items` is absent.
 
 ```bash
 curl "https://data.spuree.com/api/v1/projects/{projectId}/children" \
