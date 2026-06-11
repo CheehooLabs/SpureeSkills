@@ -134,6 +134,32 @@ curl "https://data.spuree.com/api/v1/files/{fileId}" \
 
 ---
 
+### GET /v1/files/{fileId}/content
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
+Fetch the raw text content of a file (markdown, JSON, CSV, YAML, XML, logs) inline. Use this to read a file's content directly without following a presigned download URL.
+
+This endpoint is not a replacement for file downloads. Binary files and large files should still use `GET /v1/files/{fileId}` and its `downloadUrl`.
+
+**Response:** `{ "data": { id, fileName, fileFormat, mimeType, size, encoding, content, truncated } }`
+
+| Code | Description |
+| --- | --- |
+| 200 | Text content returned |
+| 413 | File is too large to return inline |
+| 415 | Unsupported/binary format or invalid UTF-8 |
+
+```bash
+curl "https://data.spuree.com/api/v1/files/{fileId}/content" \
+  -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
+```
+
+---
+
 ### POST /v1/files
 
 Create a file record and get presigned upload URL(s). Automatically selects upload mode based on file size:
