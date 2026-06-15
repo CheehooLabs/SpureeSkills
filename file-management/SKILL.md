@@ -36,28 +36,88 @@ Or: `X-API-Key: $SPUREE_API_KEY`. See the **authentication** skill.
 
 ### GET /v1/search
 
-Search files and folders by name (case-insensitive substring match). Returns sessions first, then files.
+Full-text search across files, folders, projects, and assets. Backed by the `content_index` collection (Atlas `$search`), kept in sync via MongoDB Change Streams.
+
+> **⚠️ Breaking change (ENG-5362).** This endpoint replaced the legacy `sessions`/`files` regex search. Both the request params and the response shape changed:
+> - Matching is now Atlas **analyzer-based token matching**, not case-insensitive regex substring. `upload` no longer substring-matches `spuree_upload_test.txt`.
+> - `type` values changed: old `file` | `session` → new `file` | `folder` | `project` | `asset` (the old `session` split into `folder`/`project`, plus a new `asset` source type).
+> - Response is now **grouped** — one item per source object with a `matches[]` array — and paginated by an opaque `cursor` instead of a flat list with `limit`/offset.
 
 **Query Parameters:**
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `q` | string | — | Search query (1–255 chars) |
-| `type` | string | — | Filter: `"file"` or `"session"`. Omit for both. |
-| `workspaceId` | string | — | Restrict results to a specific workspace |
-| `limit` | integer | 100 | Max results (1–100) |
+| `q` | string | — | Search query (**required**, 1–255 chars). Full-text token match. |
+| `type` | string | — | Filter by source type: `file` \| `folder` \| `project` \| `asset`. Omit for all. |
+| `searchIn` | string | `all` | Which rows to search: `name` \| `content` (body + annotation) \| `all`. |
+| `format` | string | — | Comma-separated file formats, e.g. `txt,md`. Applies to `file` type only. |
+| `entityType` | string | — | Comma-separated entity types, e.g. `character,prop`. Applies to `asset` type only. |
+| `workspaceId` | string | — | Restrict to a single workspace (ObjectId). Must be one the caller is a member of, else empty page; malformed id → 422. |
+| `projectId` | string | — | Restrict to a single project (ObjectId). Must be one the caller can access, else empty page; malformed id → 422. |
+| `createdAfter` | string | — | ISO 8601 lower bound on source `createdAt`. **Timezone required** (`Z` or `±HH:MM`) — naive datetimes → 422. |
+| `createdBefore` | string | — | ISO 8601 upper bound. Timezone required. |
+| `limit` | integer | 50 | Page size (1–200). |
+| `cursor` | string | — | Opaque pagination token from a previous response. Pass to fetch the next page. |
+| `includePreview` | boolean | `false` | When `true`, **`asset`** results add a short-lived signed `previewUrl` (~1h) and `previewFileFormat` for the cover image/video. Other source types are unaffected; the raw bucket/key pointer is never returned. |
 
-**Response:** `{ "data": [...], "count": N }`
+**Response:** `{ "data": [...], "count": N, "cursor": "<opaque token or null>" }`
 
-Each result has `type` (`"file"` or `"session"`) plus type-specific fields:
+Each `data` item is one matched source object. Common fields:
 
-- **session**: `id`, `name`, `sessionType`, `workspaceId`, `createdAt`, `updatedAt`
-- **file**: `id`, `fileName`, `fileFormat`, `mimeType`, `size`, `workspaceId`, `sessionId`, `entitySessionId`, `createdAt`, `updatedAt`
+| Field | Type | Description |
+| --- | --- | --- |
+| `sourceType` | string | `file` \| `folder` \| `project` \| `asset` |
+| `sourceId` | string | ObjectId of the source object (the file/folder/project/asset id) |
+| `score` | number | Top relevance score across this object's matches |
+| `matchCount` | integer | Number of matching rows |
+| `matches` | array | Per-row matches (see below) |
+| `workspaceId` | string? | Workspace ObjectId |
+| `projectId` | string? | Project ObjectId |
+| `sourceCreatedAt` | datetime | Source object's creation timestamp |
+
+**File / folder / project** items additionally carry: `fileName`, `fileFormat` (file only), `sessionId` (parent project/folder), `entitySessionId` (owning entity, if any). **Folder / project** items also carry `sessionName` — the clean display name. Use it for display rather than deriving a name from `snippets`/row text, which mix the name with tags (folders) or description + tags (projects).
+
+**Asset** items instead carry asset-specific fields (no `fileName`/`fileFormat`):
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `assetName` | string | Asset (entity session) name |
+| `entityType` | string | e.g. `character`, `prop` |
+| `visibility` | string | e.g. `workspace` \| `public` |
+| `previewUrl` | string? | Signed cover URL — only when `includePreview=true` and the asset has a cover |
+| `previewFileFormat` | string? | Cover format — `jpg`/`png` (image) or `mp4`/`mov` (video). Render by this: the signed URL carries no extension. Present only with `includePreview=true` |
+
+Each entry in `matches[]`:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `rowKind` | string | `name` \| `body` \| `annotation` |
+| `score` | number | Relevance score for this row |
+| `snippets` | string[] | Pre-rendered HTML strings — hits wrapped in `<mark>`, surrounding context HTML-escaped. Safe to inject directly into an HTML renderer (e.g. React `dangerouslySetInnerHTML`); no client-side offset math. |
+| `chunkIndex` | integer? | Body chunk index (content rows) |
+| `charOffset` | integer? | Char offset of the chunk within the file (content rows) |
+| `lineStart` | integer? | Starting line number of the chunk (content rows) |
 
 ```bash
-curl "https://data.spuree.com/api/v1/search?q=hero" \
+# Find files named/containing "hero"
+curl "https://data.spuree.com/api/v1/search?q=hero&type=file" \
+  -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
+
+# Search only file names, restricted to one project, txt/md only
+curl "https://data.spuree.com/api/v1/search?q=quarterly%20report&type=file&searchIn=name&projectId=...&format=txt,md&limit=50" \
+  -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
+
+# Next page
+curl "https://data.spuree.com/api/v1/search?q=hero&cursor=<token>" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 ```
+
+**Errors specific to search:**
+
+| Code | messageCode | Cause | Resolution |
+| --- | --- | --- | --- |
+| 400 | `search_query_too_broad` | Query would match more than ~100,000 rows. Body includes `lowerBound` and `threshold`. | Prompt the user to refine with more specific terms. |
+| 422 | — | Missing/invalid `q`, naive (timezone-less) `createdAfter`/`createdBefore`, or malformed `workspaceId`/`projectId`. | Fix the parameter. |
 
 ---
 
@@ -360,12 +420,12 @@ Do **not** download the file or attempt to open it locally. The Studio URL is pe
 | **Share with user / preview** | `https://studio.spuree.com/file/{fileId}` | Permanent, permission-aware, renders preview UI |
 | **Programmatic download** | `downloadUrl` from `GET /v1/files/{fileId}` | Short-lived presigned S3 URL — do not share, bypasses permissions and expires |
 
-**Rule of thumb:** after `POST /v1/files` (upload) or `GET /v1/search`, build the Studio URL from the returned `fileId` and return that to the user. Only fetch `downloadUrl` when the agent itself needs the bytes.
+**Rule of thumb:** after `POST /v1/files` (upload) build the Studio URL from the returned `fileId`; after `GET /v1/search` use the result's `sourceId` (the file id, for `sourceType: "file"` items). Return that URL to the user. Only fetch `downloadUrl` when the agent itself needs the bytes.
 
 ### Search Then Download
 
-1. `GET /v1/search?q=hero_walk` → find file ID
-2. `GET /v1/files/{fileId}` → get `downloadUrl`
+1. `GET /v1/search?q=hero_walk&type=file` → take `sourceId` from a `sourceType: "file"` result
+2. `GET /v1/files/{sourceId}` → get `downloadUrl`
 3. Download from the presigned URL
 
 ### File Organization
