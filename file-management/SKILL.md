@@ -141,11 +141,13 @@ surfaces: ["local", "desktop", "backend", "hosted-web"]
 webSafe: true
 -->
 
-Fetch the raw text content of a file (markdown, JSON, CSV, YAML, XML, logs) inline. Use this to read a file's content directly without following a presigned download URL.
+Get inline UTF-8 text content for a small text-like file. Use this when an agent needs to read markdown, text, JSON, CSV, YAML, XML, subtitles, logs, or source files directly instead of following a short-lived CloudFront download URL.
 
 This endpoint is not a replacement for file downloads. Binary files and large files should still use `GET /v1/files/{fileId}` and its `downloadUrl`.
 
 **Response:** `{ "data": { id, fileName, fileFormat, mimeType, size, encoding, content, truncated } }`
+
+`truncated` is reserved: oversize files return `413` rather than a partial body, so it is currently always `false`.
 
 | Code | Description |
 | --- | --- |
