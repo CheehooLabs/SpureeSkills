@@ -134,6 +134,34 @@ curl "https://data.spuree.com/api/v1/files/{fileId}" \
 
 ---
 
+### GET /v1/files/{fileId}/content
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
+Get inline UTF-8 text content for a small text-like file. Use this when an agent needs to read markdown, text, JSON, CSV, YAML, XML, subtitles, logs, or source files directly instead of following a short-lived CloudFront download URL.
+
+This endpoint is not a replacement for file downloads. Binary files and large files should still use `GET /v1/files/{fileId}` and its `downloadUrl`.
+
+**Response:** `{ "data": { id, fileName, fileFormat, mimeType, size, encoding, content, truncated } }`
+
+`truncated` is reserved: oversize files return `413` rather than a partial body, so it is currently always `false`.
+
+| Code | Description |
+| --- | --- |
+| 200 | Text content returned |
+| 413 | File is too large to return inline |
+| 415 | Unsupported/binary format or invalid UTF-8 |
+
+```bash
+curl "https://data.spuree.com/api/v1/files/{fileId}/content" \
+  -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
+```
+
+---
+
 ### POST /v1/files
 
 Create a file record and get presigned upload URL(s). Automatically selects upload mode based on file size:

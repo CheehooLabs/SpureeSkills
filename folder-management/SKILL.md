@@ -237,7 +237,7 @@ curl -X DELETE "https://data.spuree.com/api/v1/sessions/64a7b8c9d1e2f3a4b5c6d7e8
 
 ### GET /v1/sessions/{sessionId}/children
 
-Browse a folder's immediate contents.
+List a folder's immediate contents — sub-folders, asset entities, and files. Use this to browse into a folder when you have its ID and want to see everything inside.
 
 **Description:** Returns the direct children of a folder: sub-folders, entities (assets), and files. Same response format as `GET /v1/projects/{projectId}/children`.
 
@@ -358,7 +358,7 @@ curl "https://data.spuree.com/api/v1/sessions/64a7b8c9d1e2f3a4b5c6d7e8/children?
 
 ### GET /v1/sessions/{sessionId}/assets
 
-Get assets (entities) in a folder.
+List the published asset entities (character, motion, prop, etc.) in a folder with their preview images. Use this when you need assets only, not raw files or sub-folders.
 
 **Description:** Returns entity sessions and their associated files for a given folder.
 
@@ -426,7 +426,7 @@ curl "https://data.spuree.com/api/v1/sessions/64a7b8c9d1e2f3a4b5c6d7e8/assets" \
 
 ### GET /v1/sessions/{sessionId}/files
 
-Get files in a folder.
+List the files directly in a folder (optionally flattened to include sub-folder files). Use this when you need file records for a known folder without browsing sub-folders.
 
 **Description:** Returns files associated with a folder. By default, flattens results to include files from sub-folders via entity session linkage.
 

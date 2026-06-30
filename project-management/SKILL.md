@@ -49,7 +49,7 @@ Project
 
 ### GET /v1/projects
 
-List projects accessible to the authenticated user, with workspace/organization lookup tables.
+List all projects accessible to the authenticated user. Use this to discover project IDs and their workspace context before browsing project contents.
 
 **Query Parameters:**
 
@@ -152,7 +152,7 @@ curl -X DELETE "https://data.spuree.com/api/v1/projects/{projectId}" \
 
 ### GET /v1/projects/{projectId}/children
 
-Browse a project's immediate contents — folders, entities (assets), and files — as a **single unified `items` list** sorted by the chosen key. Use **folder-management** skill's `GET /v1/sessions/{folderId}/children` to navigate deeper.
+List a project's immediate contents — folders, asset entities, and files — as a **single unified `items` list**. Use this after `GET /v1/projects` to start browsing a project's top-level structure; use **folder-management** skill's `GET /v1/sessions/{folderId}/children` to navigate deeper.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
