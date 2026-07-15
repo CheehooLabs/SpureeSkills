@@ -18,7 +18,7 @@ To update to the latest version, run the same command again.
 | --- | --- |
 | [Authentication](./authentication/SKILL.md) | Obtain JWT tokens, manage API keys |
 | [Project Management](./project-management/SKILL.md) | Create, list, update, delete, and share projects; browse contents |
-| [Folder Management](./folder-management/SKILL.md) | Create, update, delete, and browse folders; list assets, files, and batch downloads |
+| [Folder Management](./folder-management/SKILL.md) | List recent folders across projects; create, update, delete, browse, and download folder content |
 | [File Management](./file-management/SKILL.md) | Get, create, upload, update, and delete files with checksum-verified uploads (includes name search) |
 | [Project Invitations](./project-invitation/SKILL.md) | Manage sharing invitations for non-workspace members |
 
