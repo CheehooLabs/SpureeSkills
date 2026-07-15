@@ -60,6 +60,10 @@ Full-text search across files, folders, projects, and assets. Backed by the `con
 | `cursor` | string | — | Opaque pagination token from a previous response. Pass to fetch the next page. |
 | `includePreview` | boolean | `false` | When `true`, **`asset`** results add a short-lived signed `previewUrl` (~1h) and `previewFileFormat` for the cover image/video. Other source types are unaffected; the raw bucket/key pointer is never returned. |
 
+> **No semantic search (yet).** There is no `semantic` parameter. Matching is lexical full-text (Atlas analyzer-based token matching) — unrecognized query params such as `semantic=true` are silently ignored, so the request succeeds but results are still lexical matches. Semantic/embedding retrieval is on the roadmap.
+
+> **GET only.** `POST /v1/search` is not supported and returns `405 Method Not Allowed`. All search options are query parameters on `GET`.
+
 **Response:** `{ "data": [...], "count": N, "cursor": "<opaque token or null>" }`
 
 Each `data` item is one matched source object. Common fields:
