@@ -89,8 +89,8 @@ The default query returns the newest-created folders first. Nested folders are i
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `sortBy` | string | `createdAt` | Global sort key: `createdAt` \| `updatedAt` \| `name` |
-| `sortOrder` | string | `desc` | Sort direction: `asc` \| `desc` |
+| `sortBy` | string | `createdAt` | Global sort key: `createdAt`, `updatedAt`, or `name` |
+| `sortOrder` | string | `desc` | Sort direction: `asc` or `desc` |
 | `limit` | integer | 50 | Results per page (1-200) |
 | `offset` | integer | 0 | Number of globally sorted folders to skip |
 | `workspaceId` | string | - | Restrict to one accessible workspace ObjectId |
