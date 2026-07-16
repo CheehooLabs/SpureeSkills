@@ -1,6 +1,6 @@
 ---
 name: folder-management
-description: Create, update, delete, and browse folders (sessions) within Spuree projects, including listing assets, files, and batch file downloads
+description: List recent folders across projects; create, update, delete, and browse folders (sessions), including assets, files, and batch downloads
 ---
 
 # Folder Management
@@ -11,6 +11,7 @@ Spuree is an agent-friendly cloud storage. Projects contain folders (nestable) a
 
 Use this skill when an agent needs to:
 
+- List recently created or updated folders across all accessible projects
 - Create, rename, move, or delete folders in a project
 - Browse a folder's contents (sub-folders, entities, files)
 - List assets or files within a folder
@@ -34,9 +35,10 @@ See the **authentication** skill for obtaining tokens and managing API keys.
 
 ## Base URL
 
-```
-https://data.spuree.com/api/v1/sessions
-```
+| Operation | Base URL |
+| --- | --- |
+| Cross-project folder listing | `https://data.spuree.com/api/v1/folders` |
+| Folder CRUD and child browsing | `https://data.spuree.com/api/v1/sessions` |
 
 ## Data Model
 
@@ -71,6 +73,77 @@ Entities represent assets and have one of these types:
 `character`, `motion`, `prop`, `environment`, `visdev`, `pose`
 
 ## Endpoints
+
+### GET /v1/folders
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
+List all folders the authenticated user can access across projects, globally sorted with containing project and workspace context. Use this for requests such as “show my recently created folders”; do not substitute projects for folders.
+
+The default query returns the newest-created folders first. Nested folders are included at every depth, so no recursive project browsing is required.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `sortBy` | string | `createdAt` | Global sort key: `createdAt`, `updatedAt`, or `name` |
+| `sortOrder` | string | `desc` | Sort direction: `asc` or `desc` |
+| `limit` | integer | 50 | Results per page (1-200) |
+| `offset` | integer | 0 | Number of globally sorted folders to skip |
+| `workspaceId` | string | - | Restrict to one accessible workspace ObjectId |
+| `projectId` | string | - | Restrict to one accessible project ObjectId |
+
+**Response:**
+
+```json
+{
+  "folders": [
+    {
+      "id": "64a7b8c9d1e2f3a4b5c6d7e8",
+      "name": "Shot 010",
+      "sessionType": "session",
+      "description": "Latest shot work",
+      "createdBy": "artist@example.com",
+      "status": "active",
+      "tags": ["shot"],
+      "parentSessions": ["64a7b8c9d1e2f3a4b5c6d7e0"],
+      "projectId": "64a7b8c9d1e2f3a4b5c6d7d0",
+      "projectName": "Feature Film",
+      "workspaceId": "64a7b8c9d1e2f3a4b5c6d7c0",
+      "createdAt": "2026-07-15T17:00:00Z",
+      "updatedAt": "2026-07-15T17:00:00Z"
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+`projectId`, `projectName`, and `workspaceId` identify each folder's container. An optional filter that selects no readable project returns an empty page rather than revealing whether an inaccessible folder exists.
+
+**Status Codes:**
+
+| Code | Description |
+| --- | --- |
+| 200 | Folders returned |
+| 400 | Invalid workspace or project ObjectId filter |
+| 401 | Invalid or expired token |
+| 403 | OAuth credential lacks the `read` scope |
+| 422 | Invalid sort or pagination query value |
+| 500 | Internal server error |
+
+**Example:**
+
+```bash
+curl "https://data.spuree.com/api/v1/folders?sortBy=createdAt&sortOrder=desc&limit=20" \
+  -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
+```
+
+---
 
 ### POST /v1/sessions
 
@@ -558,6 +631,15 @@ curl -X POST "https://data.spuree.com/api/v1/sessions/files/download/urls" \
 ```
 
 ## Common Patterns
+
+### List Recently Created Folders Across Projects
+
+Call the global folder list directly; do not list projects and label them as
+folders, and do not recurse through every project's children.
+
+```text
+GET /v1/folders?sortBy=createdAt&sortOrder=desc&limit=20
+```
 
 ### Navigate a Project's Folder Structure
 
