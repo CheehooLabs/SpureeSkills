@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spuree Getting Started"
+  short_description: "Learn and start using Spuree skills"
+  default_prompt: "Use $getting-started to explain what Spuree can do and guide me through a safe first step."
