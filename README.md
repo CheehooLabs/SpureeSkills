@@ -12,10 +12,24 @@ npx skills add https://github.com/CheehooLabs/SpureeSkills
 
 To update to the latest version, run the same command again.
 
+## Getting Started
+
+After installing or connecting Spuree, ask your agent:
+
+> "How do I use Spuree skills?"
+
+The **getting-started** skill explains the available public capabilities and
+offers a guided, read-only first step. You can also ask “What can Spuree do?” or
+“Walk me through Spuree.” The guide adapts to full skill/MCP clients and to
+read-only web connectors that expose search and fetch. Studio also publishes
+the same guide as the `getting_started` MCP tool for Claude Code on the web and
+ChatGPT.
+
 ## Available Skills
 
 | Skill | Description |
 | --- | --- |
+| [Getting Started](./getting-started/SKILL.md) | Learn what Spuree can do and complete a safe guided first run |
 | [Authentication](./authentication/SKILL.md) | Obtain JWT tokens, manage API keys |
 | [Project Management](./project-management/SKILL.md) | Create, list, update, delete, and share projects; browse contents |
 | [Folder Management](./folder-management/SKILL.md) | Create, update, delete, and browse folders; list assets, files, and batch downloads |
