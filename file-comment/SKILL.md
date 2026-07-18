@@ -33,8 +33,10 @@ See the **authentication** skill for obtaining tokens and managing API keys.
 ## Base URL
 
 ```
-https://data.spuree.com/api/v1/files/{fileId}/comments
+https://data.spuree.com/api/v1/files/{fileId}
 ```
+
+Comment endpoints live under `/comments`; the mention-candidates endpoint is a sibling at `/mention-candidates`. Each endpoint heading below shows the full path.
 
 ## Endpoints
 
@@ -75,9 +77,13 @@ List a file's review comments with their threaded replies, optionally filtered b
       "replies": [
         {
           "id": "64a7b8c9d1e2f3a4b5c6d7e9",
+          "fileId": "64a7b8c9d1e2f3a4b5c6d7d0",
           "comment": "Good point, will fix",
+          "status": "pending",
+          "resolvedBy": null,
           "parentCommentId": "64a7b8c9d1e2f3a4b5c6d7e8",
           "author": { "id": "...", "name": "...", "image": "..." },
+          "canEdit": false,
           "createdAt": "2026-07-15T10:05:00Z",
           "updatedAt": "2026-07-15T10:05:00Z"
         }
@@ -120,13 +126,13 @@ surfaces: ["local", "desktop", "backend", "hosted-web"]
 webSafe: true
 -->
 
-Add a line-anchored review comment to a file, or reply to an existing comment thread. Omit `parentCommentId` for a new top-level comment (then `startLine`, `endLine`, and `sourceText` are required); provide it to reply to a top-level comment (one level of nesting only — replying to a reply is rejected).
+Add a line-anchored review comment to a file, or reply to an existing comment thread. Omit `parentCommentId` for a new top-level comment (then `startLine`, `endLine`, and `sourceText` are required); provide it to reply to a top-level comment (one level of nesting only — replying to a reply is rejected). To @mention someone, embed `<@Display Name|userId>` in the comment text — get user IDs from the mention-candidates endpoint.
 
 **Request Body:**
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `comment` | string | Yes | Comment text, max 2000 chars. May contain mention tokens `<@DisplayName\|userId>` — see the Mentions section; get user IDs from the mention-candidates endpoint |
+| `comment` | string | Yes | Comment text, max 2000 chars. May contain @mention tokens — see the Mentions section; get user IDs from the mention-candidates endpoint |
 | `startLine` | integer | Top-level only | Start line of the annotated range (1-based); required unless replying |
 | `endLine` | integer | Top-level only | End line of the annotated range, >= `startLine`; required unless replying |
 | `sourceText` | string | Top-level only | Snapshot of the annotated source text, max 5000 chars; required unless replying |
@@ -147,11 +153,15 @@ Add a line-anchored review comment to a file, or reply to an existing comment th
     "resolvedBy": null,
     "parentCommentId": null,
     "author": { "id": "64a7b8c9d1e2f3a4b5c6d7a0", "name": "Jane Doe", "image": "https://..." },
+    "canEdit": true,
+    "newlyMentioned": [],
     "createdAt": "2026-07-15T10:00:00Z",
     "updatedAt": "2026-07-15T10:00:00Z"
   }
 }
 ```
+
+`newlyMentioned` lists the user IDs newly @mentioned by this write — those users are notified.
 
 **Status Codes:**
 
@@ -189,7 +199,7 @@ surfaces: ["local", "desktop", "backend", "hosted-web"]
 webSafe: true
 -->
 
-Edit a comment's text or change its status — send `status: "resolved"` with `resolvedBy: "manual"` to resolve a comment, or `status: "pending"` to reopen it. At least one field is required; resolving a top-level comment also resolves its replies.
+Edit a comment's text or change its status — send `status: "resolved"` to resolve a comment, or `status: "pending"` to reopen it. At least one field is required; a status change on a top-level comment cascades to its replies. Any user with edit access to the file may change status; only the comment author or a project owner/admin may edit the text.
 
 **Request Body:**
 
@@ -197,7 +207,7 @@ Edit a comment's text or change its status — send `status: "resolved"` with `r
 | --- | --- | --- | --- |
 | `comment` | string | No | New comment text, max 2000 chars (author only) |
 | `status` | string | No | `pending` or `resolved` |
-| `resolvedBy` | string | No | How it was resolved: `manual` or `regeneration`; send with `status: "resolved"` |
+| `resolvedBy` | string | No | How it was resolved: `manual` or `regeneration`. Optional even when resolving — if omitted the field keeps its previous value; send `manual` when resolving so the resolution source is recorded |
 
 **Response (200):** the updated comment in `{ "data": { ... } }`, same shape as create.
 
@@ -208,7 +218,7 @@ Edit a comment's text or change its status — send `status: "resolved"` with `r
 | 200 | Comment updated |
 | 400 | No fields provided or invalid status value |
 | 401 | Invalid or expired token |
-| 403 | Not the author (text edit) or not authorized (status change) |
+| 403 | No edit access to this file, or a text edit by someone other than the author or a project owner/admin |
 | 404 | File or comment not found |
 | 500 | Internal server error |
 
@@ -343,6 +353,7 @@ Only users with access to the file can be mentioned; tokens for other users are 
 | `parentCommentId` | string? | Parent comment ID (replies only) |
 | `author` | object? | `{ id, name, image }` |
 | `canEdit` | boolean | Whether the caller may edit or delete this comment |
+| `newlyMentioned` | array? | User IDs newly @mentioned by this write (create and update responses only) |
 | `replies` | array? | Nested replies (list endpoint only) |
 | `createdAt` | datetime | Creation timestamp |
 | `updatedAt` | datetime | Last update timestamp |
@@ -373,5 +384,5 @@ Only users with access to the file can be mentioned; tokens for other users are 
 | 400 (missing fields) | Top-level comment without `startLine`/`endLine`/`sourceText` | Include the line range and source snapshot, or add `parentCommentId` to reply |
 | 400 (nested reply) | `parentCommentId` points at a reply | Reply to the top-level comment instead |
 | 401 (unauthorized) | Expired or invalid token | Refresh via the **authentication** skill |
-| 403 (forbidden) | View-only access (create), or not the author/moderator (edit, delete) | Ask for edit access, or only modify your own comments |
+| 403 (forbidden) | View-only access (create, status change), or not the author/moderator (text edit, delete) | Ask for edit access, or only modify your own comments |
 | 404 (not found) | File, comment, or parent comment missing or deleted | Verify the IDs |
