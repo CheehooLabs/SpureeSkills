@@ -25,6 +25,10 @@ read-only web connectors that expose search and fetch. Studio also publishes
 the same guide as the `getting_started` MCP tool for Claude Code on the web and
 ChatGPT.
 
+## Install Guide
+
+Connect Claude Code, Claude Code Web & Cowork, ChatGPT, Codex, or OpenClaw — via the OAuth connector or skills + API keys. See [INSTALL.md](./INSTALL.md).
+
 ## Available Skills
 
 | Skill | Description |
