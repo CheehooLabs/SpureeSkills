@@ -28,7 +28,7 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 **Connector path (recommended):**
 
 1. On claude.ai, open **Customize > Connectors** ([claude.ai/customize/connectors](https://claude.ai/customize/connectors)). Pick Spuree from the directory if it's listed, or add it as a custom connector with server URL `https://spuree.com/mcp`. On Team/Enterprise plans, an Owner adds it in **Organization settings > Connectors** first; members then connect individually.
-2. Your browser opens the **Allow Spuree access** consent screen on spuree.com, listing four scopes (see [Using the connector](#using-the-connector)). Click **Allow**.
+2. Your browser opens Spuree's consent screen on spuree.com — **Authorize** plus your client's name — listing four scopes (see [Using the connector](#using-the-connector)). Click **Allow**.
 3. In Claude Code, make sure you're logged in with your claude.ai account — run `/status` to check. Connectors do **not** load when your session authenticates via `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, an `apiKeyHelper`, Bedrock/Vertex, or a setup token.
 4. Run `/mcp` — connectors from claude.ai appear with a claude.ai indicator. In the desktop app you can also manage them under **Settings > Connectors**.
 5. Verify with a read-only call: ask *"List my Spuree projects"*.
@@ -44,7 +44,7 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 ### Claude Code on the web and Claude Cowork
 
 1. Add Spuree once at the account level: on claude.ai, open **Customize > Connectors**, click **+** / **Add custom connector**, and paste `https://spuree.com/mcp` (or select Spuree from the directory if listed). On Team/Enterprise plans, an Owner adds it in **Organization settings > Connectors** first; members then connect individually.
-2. Approve the **Allow Spuree access** consent screen.
+2. Approve Spuree's **Authorize** consent screen.
 3. **Claude Code on the web:** log in to [claude.ai/code](https://claude.ai/code) with the same account and start a new session — connectors added in claude.ai are provisioned into web sessions automatically.
 4. **Claude Cowork:** no separate setup. Control which connectors are active via the **+** menu in the chat box or the **Customize > Connectors** page.
 5. Verify: ask *"List my Spuree projects"*. Successful responses include `webUrl` links into the Spuree web app.
@@ -58,7 +58,7 @@ Custom connectors require a paid ChatGPT plan — Plus, Pro, Business/Team, Ente
 1. Open **Settings > Connectors > Advanced** and enable **Developer mode**.
 2. Go to **Settings > Connectors > Create** (on some builds: **Custom connectors > Add**).
 3. Name the connector **Spuree**, paste the server URL `https://spuree.com/mcp/chatgpt`, and leave authentication set to **OAuth**. ChatGPT has its own adapter endpoint — don't use the `https://spuree.com/mcp` URL meant for Claude surfaces.
-4. ChatGPT redirects to spuree.com and shows the **Allow Spuree access** consent screen. Click **Allow**. The screen lists all four scopes — approval is all-or-nothing in v1 — but the ChatGPT surface can only ever call its three read-only tools, so the `write`, `invite`, and `render` scopes are never exercised there.
+4. ChatGPT redirects to spuree.com and shows Spuree's **Authorize ChatGPT** consent screen. Click **Allow**. The screen lists all four scopes — approval is all-or-nothing in v1 — but the ChatGPT surface can only ever call its three read-only tools, so the `write`, `invite`, and `render` scopes are never exercised there.
 5. The connector appears in the tool picker — start a new chat; existing chats won't see the connector.
 
 **What you get in ChatGPT:** a read-only surface with exactly three tools — `search` (full-text search with links into Spuree), `fetch` (read a file or list a project/folder's children), and `getting_started` (the onboarding guide). The full `project_*` / `folder_*` / `file_*` tool set is **not** available from ChatGPT, and asking for those tools returns an unknown-tool error.
@@ -95,7 +95,7 @@ Skills are documentation, not MCP tools — nothing new appears in OpenClaw's to
 
 ### The consent screen
 
-When you connect, spuree.com shows an **Allow Spuree access** screen listing four scopes. Approval is all-or-nothing in v1 — you approve all four or decline:
+When you connect, spuree.com shows a consent screen — **Authorize** plus your client's name — listing four scopes. Approval is all-or-nothing in v1 — you approve all four or decline:
 
 | Scope | What it allows |
 | --- | --- |
