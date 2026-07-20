@@ -126,7 +126,7 @@ surfaces: ["local", "desktop", "backend", "hosted-web"]
 webSafe: true
 -->
 
-Add a line-anchored review comment to a file, or reply to an existing comment thread. Omit `parentCommentId` for a new top-level comment (then `startLine`, `endLine`, and `sourceText` are required); provide it to reply to a top-level comment (one level of nesting only — replying to a reply is rejected). To @mention someone, embed `<@Display Name|userId>` in the comment text — get user IDs from the mention-candidates endpoint.
+Add a line-anchored review comment to a file, or reply to an existing comment thread. Omit `parentCommentId` for a new top-level comment (then `startLine`, `endLine`, and `sourceText` are required); provide it to reply to a top-level comment (one level of nesting only — replying to a reply is rejected). To @mention someone, embed `<@DisplayName|userId>` in the comment text — get user IDs from the mention-candidates endpoint.
 
 **Request Body:**
 
