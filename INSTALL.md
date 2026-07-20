@@ -158,6 +158,8 @@ Full details live in the [authentication skill](https://github.com/CheehooLabs/S
 - **Option B (agent-driven):** the agent exchanges your email/password at `POST https://studio.spuree.com/api/auth/token` for a 1-hour JWT, then mints a key with `POST https://data.spuree.com/api/v1/api-keys` using `Authorization: Bearer <access_token>`.
 - **Option C (browser SSO — no password shared with the agent):** the agent starts a local callback server on an ephemeral port (49152–65535), opens `https://studio.spuree.com/auth/signin?source=api&port=<port>`, receives a single-use exchange code (valid 60 seconds) at `http://localhost:<port>/callback`, trades it via `POST https://studio.spuree.com/api/auth/token/exchange`, then creates the key as in Option B.
 
+> **Caution — Option B shares your password.** Only run Option B with a **local agent you control and trust**; it sends your Spuree email and password to whatever agent executes it. Never enter your Spuree password into a hosted or third-party chat client (ChatGPT, Claude on the web, etc.), where it would be transmitted to that provider. When in doubt, prefer **Option C** (browser SSO — your password never reaches the agent) or **Option A** (create the key yourself in the web UI).
+
 ### Two headers, two credentials
 
 Every V1 data endpoint accepts either:
