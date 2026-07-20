@@ -137,7 +137,7 @@ A successful first call looks like this (illustrative — your project names and
 
 ### Revoking access
 
-- **Spuree side (connector):** open [spuree.com/account/connections](https://spuree.com/account/connections), find the connected app, and click **Disconnect**. Access is cut within seconds. Tokens are scoped per app, so revoking one connector doesn't affect others. Reconnecting later shows the consent screen again and issues a fresh token.
+- **Spuree side (connector):** open [studio.spuree.com/account/connections](https://studio.spuree.com/account/connections), find the connected app, and click **Revoke**. Access is cut within seconds. Tokens are scoped per app, so revoking one connector doesn't affect others. Reconnecting later shows the consent screen again and issues a fresh token.
 - **Client side (connector):** also remove the connector in your client — on claude.ai under **Customize > Connectors**, in ChatGPT under **Settings > Connectors**.
 - **API keys:** manage and revoke keys at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys), or via `DELETE /v1/api-keys/{key_id}` (JWT Bearer required).
 
@@ -191,7 +191,7 @@ If your projects come back as JSON, you're connected.
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `401 invalid_token` on a connector call | The token expired or was revoked | Reconnect from your client's connector UI (e.g. ChatGPT: **Settings > Connectors > Spuree > Reconnect**) |
-| `403 insufficient_scope` | The token lacks a required scope | Disconnect at [spuree.com/account/connections](https://spuree.com/account/connections), then reconnect to re-consent to the full scope set |
+| `403 insufficient_scope` | The token lacks a required scope | Revoke at [studio.spuree.com/account/connections](https://studio.spuree.com/account/connections), then reconnect to re-consent to the full scope set |
 | Spuree missing from `/mcp` in Claude Code | Session isn't authenticated with a claude.ai subscription login | Run `/status`; connectors don't load when `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `apiKeyHelper`, Bedrock/Vertex, or a setup token is active |
 | *"does not support dynamic client registration"* when direct-adding in Claude Code | Spuree's OAuth server has no dynamic client registration | Add Spuree on claude.ai instead ([claude.ai/customize/connectors](https://claude.ai/customize/connectors)) and let it flow into Claude Code |
 | No way to add a connector in ChatGPT Settings | Free tier (custom connectors need a paid plan), or Developer mode isn't enabled | Upgrade to a paid plan (Plus, Pro, Business/Team, Enterprise, Edu), then enable **Settings > Connectors > Advanced > Developer mode** (naming varies as ChatGPT evolves) |
