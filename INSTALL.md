@@ -139,7 +139,7 @@ A successful first call looks like this (illustrative — your project names and
 
 - **Spuree side (connector):** open [studio.spuree.com/account/connections](https://studio.spuree.com/account/connections), find the connected app, and click **Revoke**. Access is cut within seconds. Tokens are scoped per app, so revoking one connector doesn't affect others. Reconnecting later shows the consent screen again and issues a fresh token.
 - **Client side (connector):** also remove the connector in your client — on claude.ai under **Customize > Connectors**, in ChatGPT under **Settings > Connectors**.
-- **API keys:** manage and revoke keys at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys), or via `DELETE /v1/api-keys/{key_id}` (JWT Bearer required).
+- **API keys:** manage and revoke keys at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys), or via `DELETE https://data.spuree.com/api/v1/api-keys/{key_id}` (JWT Bearer required).
 
 ## Using API keys
 
