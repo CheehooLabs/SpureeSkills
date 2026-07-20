@@ -97,7 +97,7 @@ List a file's review comments with their threaded replies, optionally filtered b
 }
 ```
 
-Replies are nested under their parent's `replies` array — they are not top-level items. `canComment` is `false` when the caller has view-only access to the file; `canEdit` marks the comments the caller may edit or delete (their own, or any comment if they are a project owner/admin).
+Replies are nested under their parent's `replies` array — they are not top-level items. `canComment` is `false` when the caller has view-only access to the file; `canEdit` marks the comments the caller may edit or delete — their own, or any comment if they are a project owner/admin — but only with edit access to the file (a view-only caller gets `canEdit: false` on every comment, including their own).
 
 **Status Codes:**
 
@@ -168,10 +168,11 @@ Add a line-anchored review comment to a file, or reply to an existing comment th
 | Code | Description |
 | --- | --- |
 | 201 | Comment created |
-| 400 | Missing required fields, invalid line range, or reply-to-a-reply |
+| 400 | Reply to a reply (nesting is one level only), or parent comment not found |
 | 401 | Invalid or expired token |
 | 403 | No edit access to this file |
-| 404 | File or parent comment not found |
+| 404 | File not found |
+| 422 | Invalid body — missing `startLine`/`endLine`/`sourceText` on a top-level comment, `endLine` < `startLine`, or `comment`/`sourceText` over its length limit |
 | 500 | Internal server error |
 
 **Example:**
@@ -205,7 +206,7 @@ Edit a comment's text or change its status — send `status: "resolved"` to reso
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `comment` | string | No | New comment text, max 2000 chars (author only) |
+| `comment` | string | No | New comment text, max 2000 chars (author or a project owner/admin only) |
 | `status` | string | No | `pending` or `resolved` |
 | `resolvedBy` | string | No | How it was resolved: `manual` or `regeneration`. Optional even when resolving — if omitted the field keeps its previous value; send `manual` when resolving so the resolution source is recorded |
 
@@ -216,10 +217,11 @@ Edit a comment's text or change its status — send `status: "resolved"` to reso
 | Code | Description |
 | --- | --- |
 | 200 | Comment updated |
-| 400 | No fields provided or invalid status value |
+| 400 | No fields provided, or invalid comment ID format |
 | 401 | Invalid or expired token |
 | 403 | No edit access to this file, or a text edit by someone other than the author or a project owner/admin |
 | 404 | File or comment not found |
+| 422 | Invalid `status` or `resolvedBy` value |
 | 500 | Internal server error |
 
 **Example:**
@@ -299,7 +301,7 @@ List the users who can be @mentioned in comments on a file, with the user IDs ne
 }
 ```
 
-Returns at most 10 candidates; use `q` to narrow the list when mentioning someone specific.
+Returns at most 10 candidates; use `q` to narrow the list when mentioning someone specific. `image` is present only for users who have a profile picture.
 
 **Status Codes:**
 
@@ -381,8 +383,9 @@ Only users with access to the file can be mentioned; tokens for other users are 
 
 | Error | Cause | Resolution |
 | --- | --- | --- |
-| 400 (missing fields) | Top-level comment without `startLine`/`endLine`/`sourceText` | Include the line range and source snapshot, or add `parentCommentId` to reply |
+| 422 (invalid body) | Top-level comment without `startLine`/`endLine`/`sourceText`, or a field over its length limit | Include the line range and source snapshot, or add `parentCommentId` to reply |
 | 400 (nested reply) | `parentCommentId` points at a reply | Reply to the top-level comment instead |
+| 400 (bad parent) | `parentCommentId` doesn't match a top-level comment on this file | Verify the parent comment id |
 | 401 (unauthorized) | Expired or invalid token | Refresh via the **authentication** skill |
 | 403 (forbidden) | View-only access (create, status change), or not the author/moderator (text edit, delete) | Ask for edit access, or only modify your own comments |
-| 404 (not found) | File, comment, or parent comment missing or deleted | Verify the IDs |
+| 404 (not found) | File or comment missing or deleted | Verify the IDs |
