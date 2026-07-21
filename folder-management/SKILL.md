@@ -534,11 +534,16 @@ List the files directly in a folder (optionally flattened to include sub-folder 
         "frameCount": 300,
         "durationSeconds": 10.0,
         "fileSize": "1048576"
-      }
+      },
+      "createdBy": "artist@example.com",
+      "createdAt": "2026-07-15T17:00:00Z",
+      "updatedAt": "2026-07-15T17:05:00Z"
     }
   ]
 }
 ```
+
+`createdAt` and `createdBy` identify when and by whom each file was created; legacy files may omit them.
 
 **Status Codes:**
 
