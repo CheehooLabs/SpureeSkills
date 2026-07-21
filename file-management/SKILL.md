@@ -121,6 +121,81 @@ curl "https://data.spuree.com/api/v1/search?q=hero&cursor=<token>" \
 
 ---
 
+### GET /v1/files
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
+List all files the authenticated user can access across projects, globally sorted with containing project and workspace context. Use this for requests such as "show my recent files" or "files I created recently" (`createdBy=me`); do not substitute search — `GET /v1/search` requires a keyword.
+
+The default query returns the newest-created files first. Files are included from every folder and asset sub-session at any depth, so no recursive browsing is required.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `sortBy` | string | `createdAt` | Global sort key: `createdAt`, `updatedAt`, or `name` |
+| `sortOrder` | string | `desc` | Sort direction: `asc` or `desc` |
+| `limit` | integer | 50 | Results per page (1-200) |
+| `offset` | integer | 0 | Number of globally sorted files to skip |
+| `createdBy` | string | - | `me` (the caller) or a creator email; only files that user created |
+| `workspaceId` | string | - | Restrict to one accessible workspace ObjectId |
+| `projectId` | string | - | Restrict to one accessible project ObjectId |
+| `format` | string | - | Comma-separated file formats, e.g. `txt,md,mp4` |
+| `createdAfter` | string | - | ISO 8601 lower bound on `createdAt`; timezone required (e.g. `2026-07-01T00:00:00Z`) |
+| `createdBefore` | string | - | ISO 8601 upper bound on `createdAt`; timezone required |
+
+**Response:**
+
+```json
+{
+  "files": [
+    {
+      "id": "64a7b8c9d1e2f3a4b5c6d7ea",
+      "fileName": "hero_walk",
+      "fileFormat": "fbx",
+      "fileSize": 1048576,
+      "sessionId": "64a7b8c9d1e2f3a4b5c6d7e8",
+      "entitySessionId": null,
+      "projectId": "64a7b8c9d1e2f3a4b5c6d7d0",
+      "projectName": "Feature Film",
+      "workspaceId": "64a7b8c9d1e2f3a4b5c6d7c0",
+      "createdBy": "artist@example.com",
+      "createdAt": "2026-07-15T17:00:00Z",
+      "updatedAt": "2026-07-15T17:00:00Z"
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+`projectId`, `projectName`, and `workspaceId` identify each file's container. A filter that selects no readable project returns an empty page rather than revealing whether an inaccessible file exists. Legacy files may omit `createdBy`/`createdAt`.
+
+**Status Codes:**
+
+| Code | Description |
+| --- | --- |
+| 200 | Files returned |
+| 400 | Invalid workspace or project ObjectId filter |
+| 401 | Invalid or expired token |
+| 403 | OAuth credential lacks the `read` scope |
+| 422 | Invalid sort, pagination, or timezone-less date query value |
+| 500 | Internal server error |
+
+**Example:**
+
+```bash
+# The user's most recently created files
+curl "https://data.spuree.com/api/v1/files?createdBy=me&sortBy=createdAt&sortOrder=desc&limit=20" \
+  -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
+```
+
+---
+
 ### GET /v1/files/{fileId}
 
 Get file metadata and presigned download URL.
@@ -449,6 +524,14 @@ Do **not** download the file or attempt to open it locally. The Studio URL is pe
 | **Programmatic download** | `downloadUrl` from `GET /v1/files/{fileId}` | Short-lived presigned S3 URL — do not share, bypasses permissions and expires |
 
 **Rule of thumb:** after `POST /v1/files` (upload) build the Studio URL from the returned `fileId`; after `GET /v1/search` use the result's `sourceId` (the file id, for `sourceType: "file"` items). Return that URL to the user. Only fetch `downloadUrl` when the agent itself needs the bytes.
+
+### List Recent Files
+
+```
+GET /v1/files?createdBy=me&sortBy=createdAt&sortOrder=desc&limit=20
+```
+
+One call answers "what did I create recently" across every accessible project; narrow with `projectId`, `workspaceId`, `format`, or `createdAfter` as needed.
 
 ### Search Then Download
 
