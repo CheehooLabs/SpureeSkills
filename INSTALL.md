@@ -23,7 +23,7 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 
 ## Client setup guides
 
-**About the skills installer** (applies to every skills-path client below): `npx skills add …` is interactive — it prompts you to pick skills, **which agents to install for** (this choice matters: see each client's section), and an install scope, then shows a third-party security assessment before finishing. That assessment may flag the `authentication` skill as high-risk; this is a keyword-driven false positive — the skills are documentation-only (no scripts or executables), and every endpoint they describe points at Spuree's own domains. Review the installed SKILL.md files if you want to confirm, then proceed. You can also paste the install command into your agent's chat and let the agent run the installer itself — it completes non-interactively with default targets, so double-check afterwards that your client was covered.
+**About the skills installer** (applies to every skills-path client below): `npx skills add …` is interactive — it prompts you to pick skills, **which agents to install for** (this choice matters: see each client's section), and an install scope, then shows a third-party security assessment before finishing. That assessment may flag the `authentication` skill as high-risk; this is a keyword-driven false positive — the skills are documentation-only (no scripts or executables), and every endpoint they describe points at Spuree's own domains. Review the installed SKILL.md files if you want to confirm, then proceed. You can also paste the install command into your agent's chat and let the agent run the installer itself — it completes non-interactively with the installer's default targets. Those defaults have been observed to cover Claude Code, but they are the installer's choice, not a guarantee: afterwards, run your client section's confirmation step (for Claude Code, `ls .claude/skills/`) before relying on the skills.
 
 ### Claude Code (CLI and desktop app)
 
@@ -183,7 +183,7 @@ If both headers are sent, the JWT wins. Refresh tokens are single-use — always
 
 - The key is shown **once**, at creation. Save it immediately.
 - Keep it in an environment variable (`SPUREE_API_KEY`) — never paste it into a chat conversation, prompt, or log.
-- If a key **is** ever pasted into a chat, treat it as exposed: create a new key, update every place the old one is stored (shell environment, client/environment secrets), then revoke the old one.
+- If a key **is** ever pasted into a chat, treat it as exposed: create a new key, update every place the old one is stored, then revoke the old one. Places to check: your shell environment or profile, client/environment secrets (e.g. a Codex environment secret), and on Windows the persisted User-scope variable — it lives in the registry (`HKCU\Environment`) and survives until you remove or replace it: `[Environment]::SetEnvironmentVariable("SPUREE_API_KEY", $null, "User")` deletes it.
 - Keys are user-scoped and grant the full V1 surface for your user, optionally restricted to specific organizations at creation time.
 - Revoke a key you no longer need at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys) or with `DELETE /v1/api-keys/{key_id}` (JWT Bearer required).
 
