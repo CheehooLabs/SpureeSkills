@@ -55,10 +55,11 @@ List all projects accessible to the authenticated user. Use this to discover pro
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `sortBy` | string | `updatedAt` | Sort field: `updatedAt`, `createdAt`, `name` |
-| `sortOrder` | string | `desc` | Sort order: `asc`, `desc` |
+| `sortOrder` | string | `asc` | Direction of the name sort: `asc`, `desc` |
 | `limit` | integer | 500 | Results per page (1–1000) |
 | `offset` | integer | 0 | Items to skip |
+
+Results are always sorted by **project name** (case-insensitive); `sortOrder` only flips the direction. There is **no** `sortBy` on this endpoint — an unknown parameter is silently ignored, so never present the result as sorted by update time. To order by recency, sort the response client-side on `updatedAt` — and if the listing spans more than one page, fetch every page first: a single page is a name-ordered slice, so sorting one page alone does not yield the globally most recent projects.
 
 **Response:**
 

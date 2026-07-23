@@ -5,7 +5,7 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 - **Connector (OAuth MCP)** — paste a URL into your client, sign in through your browser, and approve access once; from then on your AI tool can work with your Spuree projects directly. (Behind the scenes: MCP is the standard protocol AI tools use to talk to services, and OAuth is the browser sign-in that authorizes it.) No keys to copy, revocable from your Spuree account at any time. Best for hosted and chat-style clients (claude.ai surfaces, ChatGPT). The server URL for Claude surfaces is `https://spuree.com/mcp`; ChatGPT uses its own URL (see [ChatGPT](#chatgpt)).
 - **Skills + API key** — install the [Spuree skill docs](https://github.com/CheehooLabs/SpureeSkills) into your agent and authenticate against the REST API with an API key. Best for CLI agents (Codex, OpenClaw, local Claude Code) and for the full V1 API surface, including binary file uploads, which the hosted connector does not offer.
 
-**Before you start:** you need a Spuree account — sign up at [studio.spuree.com](https://studio.spuree.com). Three domains appear in this guide: **spuree.com** is the main site (and the consent screen you'll approve), **studio.spuree.com** is the web app, and **data.spuree.com** is the API host.
+**Before you start:** you need a Spuree account — sign up at [studio.spuree.com](https://studio.spuree.com). Three domains appear in this guide: **spuree.com** is the main site, **studio.spuree.com** is the web app (and where the consent screen you'll approve is shown), and **data.spuree.com** is the API host.
 
 > **Note:** The Spuree connector is currently in early access. If the OAuth flow is not yet enabled for your account and your client supports skills (Claude Code, Codex, OpenClaw), use the skills + API key path in the meantime. ChatGPT has no skills path — if the connector isn't enabled for your account yet, wait for general availability.
 
@@ -23,12 +23,14 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 
 ## Client setup guides
 
+**About the skills installer** (applies to every skills-path client below): `npx skills add …` is interactive — it prompts you to pick skills, **which agents to install for** (this choice matters: see each client's section), and an install scope, then shows a third-party security assessment before finishing. That assessment may flag the `authentication` skill as high-risk; this is a keyword-driven false positive — the skills are documentation-only (no scripts or executables), and every endpoint they describe points at Spuree's own domains. Review the installed SKILL.md files if you want to confirm, then proceed. You can also paste the install command into your agent's chat and let the agent run the installer itself — it completes non-interactively with the installer's default targets. Those defaults have been observed to cover Claude Code, but they are the installer's choice, not a guarantee: afterwards, run your client section's confirmation step (for Claude Code, `ls .claude/skills/`) before relying on the skills.
+
 ### Claude Code (CLI and desktop app)
 
 **Connector path (recommended):**
 
 1. On claude.ai, open **Customize > Connectors** ([claude.ai/customize/connectors](https://claude.ai/customize/connectors)). Pick Spuree from the directory if it's listed, or add it as a custom connector with server URL `https://spuree.com/mcp`. On Team/Enterprise plans, an Owner adds it in **Organization settings > Connectors** first; members then connect individually.
-2. Your browser opens Spuree's consent screen on spuree.com — **Authorize** plus your client's name — listing four scopes (see [Using the connector](#using-the-connector)). Click **Allow**.
+2. Your browser opens Spuree's consent screen on studio.spuree.com — **Authorize** plus your client's name — listing four scopes (see [Using the connector](#using-the-connector)). Click **Allow**.
 3. In Claude Code, make sure you're logged in with your claude.ai account — run `/status` to check. Connectors do **not** load when your session authenticates via `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, an `apiKeyHelper`, Bedrock/Vertex, or a setup token.
 4. Run `/mcp` — connectors from claude.ai appear with a claude.ai indicator. In the desktop app you can also manage them under **Settings > Connectors**.
 5. Verify with a read-only call: ask *"List my Spuree projects"*.
@@ -37,9 +39,9 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 
 **Skills + API key path:**
 
-1. Install the skill docs: `npx skills add https://github.com/CheehooLabs/SpureeSkills` (re-run later to update). Requires Node.js 18+; `skills` is the open-source skills CLI, fetched on demand by npx.
-2. Get an API key (see [Using API keys](#using-api-keys)) and export it before launching Claude Code: `export SPUREE_API_KEY="<your-api-key>"`.
-3. Ask *"How do I use Spuree skills?"* — this activates the getting-started skill for a guided, read-only first run — then *"List my Spuree projects"* to verify.
+1. In your project folder, install the skill docs: `npx skills add https://github.com/CheehooLabs/SpureeSkills` (requires Node.js 18+; `skills` is the open-source skills CLI, fetched on demand by npx; re-run later to update). **When the installer asks which agents to install to, select "Claude Code."** That selection is what creates `.claude/skills/` symlinks in your project — the location Claude Code actually reads. The universal `.agents/skills` target alone is **not** discovered by Claude Code, so skipping the picker installs the skills somewhere Claude Code never looks, with no error anywhere. Confirm with `ls .claude/skills/`.
+2. Get an API key (see [Using API keys](#using-api-keys)) and set it before launching Claude Code. macOS/Linux: `export SPUREE_API_KEY="<your-api-key>"`. Windows (PowerShell): persist it with `[Environment]::SetEnvironmentVariable("SPUREE_API_KEY", "<your-api-key>", "User")`, then **fully restart Claude Code** — environment variables are read at process start, so a new tab or window is not enough.
+3. Launch Claude Code **in the same folder you installed into** — a project-level install is only visible from that folder — and ask *"How do I use Spuree skills?"* — this activates the getting-started skill for a guided, read-only first run — then *"List my Spuree projects"* to verify.
 
 ### Claude Code on the web and Claude Cowork
 
@@ -58,7 +60,7 @@ Custom connectors require a paid ChatGPT plan — Plus, Pro, Business/Team, Ente
 1. Open **Settings > Connectors > Advanced** and enable **Developer mode**.
 2. Go to **Settings > Connectors > Create** (on some builds: **Custom connectors > Add**).
 3. Name the connector **Spuree**, paste the server URL `https://spuree.com/mcp/chatgpt`, and leave authentication set to **OAuth**. ChatGPT has its own adapter endpoint — don't use the `https://spuree.com/mcp` URL meant for Claude surfaces.
-4. ChatGPT redirects to spuree.com and shows Spuree's **Authorize ChatGPT** consent screen. Click **Allow**. The screen lists all four scopes — approval is all-or-nothing in v1 — but the ChatGPT surface can only ever call its three read-only tools, so the `write`, `invite`, and `render` scopes are never exercised there.
+4. ChatGPT redirects to studio.spuree.com and shows Spuree's **Authorize ChatGPT** consent screen. Click **Allow**. The screen lists all four scopes — approval is all-or-nothing in v1 — but the ChatGPT surface can only ever call its three read-only tools, so the `write`, `invite`, and `render` scopes are never exercised there.
 5. The connector appears in the tool picker — start a new chat; existing chats won't see the connector.
 
 **What you get in ChatGPT:** a read-only surface with exactly three tools — `search` (full-text search with links into Spuree), `fetch` (read a file or list a project/folder's children), and `getting_started` (the onboarding guide). The full `project_*` / `folder_*` / `file_*` tool set is **not** available from ChatGPT, and asking for those tools returns an unknown-tool error.
@@ -73,10 +75,14 @@ The connector path is not available for Codex today (Codex's MCP OAuth login req
 
 1. Create a Spuree account at [studio.spuree.com](https://studio.spuree.com), then create an API key at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys). **Save it immediately — it's shown only once.**
 2. In your project repository, install the skill docs: `npx skills add https://github.com/CheehooLabs/SpureeSkills -a codex` (or choose Codex when prompted; requires Node.js 18+ — `skills` is the open-source skills CLI, fetched on demand by npx). The CLI prompts for the target — project-level `.agents/skills/` is the safest choice — then confirm the files landed: `ls .agents/skills/`. Re-run the same command to update.
-3. Export the key in the environment Codex runs in, before launching it: `export SPUREE_API_KEY="<your-api-key>"`.
-4. Start Codex and ask *"How do I use Spuree skills?"* — this activates the getting-started skill. You can also invoke a skill explicitly via `/skills` or a `$skill-name` mention.
+3. Set the key in the environment Codex runs in, before launching it. macOS/Linux: `export SPUREE_API_KEY="<your-api-key>"`. Windows (PowerShell): `[Environment]::SetEnvironmentVariable("SPUREE_API_KEY", "<your-api-key>", "User")`, then open a **new terminal window** (not just a new tab — tabs inherit the terminal app's original environment) for it to take effect.
+4. Start Codex **in the same folder you ran the install in** — a project-level install is only visible from that directory — and ask *"How do I use Spuree skills?"* — this activates the getting-started skill. You can also invoke a skill explicitly via `/skills` or a `$skill-name` mention.
 5. Verify with *"List my Spuree projects"* — if projects come back, the key works.
 6. Optional: if Codex answers from memory without ever calling data.spuree.com, implicit skill activation isn't kicking in — add a note to your repo's `AGENTS.md` pointing at the skills in `.agents/skills/` and stating that Spuree V1 calls go to `https://data.spuree.com/api` with the `X-API-Key` header.
+
+> **Heads-up:** Codex also reads a **global** `~/.agents/skills/` directory. If an older install exists there, launching Codex outside your project folder silently falls back to those copies — you'll get stale skill docs (and possibly skills you never installed) with no warning. If Codex describes capabilities you don't recognize, check that location and update or remove it.
+
+**Codex cloud / web:** the skills path works there too. Add `SPUREE_API_KEY` as a secret in your Codex **environment settings**, then paste the `npx skills add https://github.com/CheehooLabs/SpureeSkills` command into the chat — the agent installs the skills into its cloud workspace itself. The install is per-environment, and when you rotate your API key, remember to update the Codex environment secret as well.
 
 ### OpenClaw
 
@@ -95,7 +101,7 @@ Skills are documentation, not MCP tools — nothing new appears in OpenClaw's to
 
 ### The consent screen
 
-When you connect, spuree.com shows a consent screen — **Authorize** plus your client's name — listing four scopes. Approval is all-or-nothing in v1 — you approve all four or decline:
+When you connect, studio.spuree.com shows a consent screen — **Authorize** plus your client's name — listing four scopes. Approval is all-or-nothing in v1 — you approve all four or decline:
 
 | Scope | What it allows |
 | --- | --- |
@@ -177,6 +183,7 @@ If both headers are sent, the JWT wins. Refresh tokens are single-use — always
 
 - The key is shown **once**, at creation. Save it immediately.
 - Keep it in an environment variable (`SPUREE_API_KEY`) — never paste it into a chat conversation, prompt, or log.
+- If a key **is** ever pasted into a chat, treat it as exposed: create a new key, update every place the old one is stored, then revoke the old one. Places to check: your shell environment or profile, client/environment secrets (e.g. a Codex environment secret), and on Windows the persisted User-scope variable — it lives in the registry (`HKCU\Environment`) and survives until you remove or replace it: `[Environment]::SetEnvironmentVariable("SPUREE_API_KEY", $null, "User")` deletes it.
 - Keys are user-scoped and grant the full V1 surface for your user, optionally restricted to specific organizations at creation time.
 - Revoke a key you no longer need at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys) or with `DELETE /v1/api-keys/{key_id}` (JWT Bearer required).
 
@@ -203,5 +210,8 @@ If your projects come back as JSON, you're connected.
 | `POST /v1/api-keys` rejected when sent with `X-API-Key` | Key management requires a JWT Bearer, not an API key | Get a JWT via `/auth/token` (or the SSO flow) first |
 | Repeated auth failures | Auth endpoints are rate-limited and repeated failed logins temporarily lock the account | Wait a few minutes and retry; slow down automated login attempts |
 | Truncated results on large listings in Claude Code | MCP tool output is capped at 25,000 tokens by default | Raise the cap with the `MAX_MCP_OUTPUT_TOKENS` environment variable, or narrow the request |
+| Skills installed, but the agent doesn't see them | The install didn't target your client — Claude Code reads `.claude/skills/`, which is only created when you select **Claude Code** in the installer's agent picker — or the agent was launched in a different folder than the install (project-level installs are only visible from that folder, for every client) | Re-run `npx skills add …` and select your client in the picker; launch the agent in the folder you installed into |
+| `401 {"detail": "Invalid API key"}` on a V1 call | The key reached the API but doesn't exist or was revoked (a rotated-out key in a stale environment is the classic cause) | Create a new key at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys), update it everywhere it's stored, and restart the client |
+| `401 "Authentication required…"` on a V1 call | No credential was sent at all — `SPUREE_API_KEY` isn't visible to the client's process | Set the variable and **fully restart** the client (environment variables are read at process start) |
 
 Still stuck? On a connector surface, ask *"How do I use Spuree?"* (runs the `getting_started` tool); on the skills path, ask *"How do I use Spuree skills?"* (activates the getting-started skill). Both give a safe, read-only walkthrough that verifies your setup step by step.
