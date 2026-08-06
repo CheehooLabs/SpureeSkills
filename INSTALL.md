@@ -106,9 +106,10 @@ The Hermes CLI and the Hermes Desktop app share one home directory (`~/.hermes` 
 
 1. Create a Spuree account at [studio.spuree.com](https://studio.spuree.com) and create an API key at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys). **Save it immediately, it's shown only once.**
 2. Install the skills globally: `npx skills add https://github.com/CheehooLabs/SpureeSkills -a hermes-agent -g` (the agent name is `hermes-agent`, not `hermes`). This installs into `skills/` under the Hermes home, where every Hermes surface reads them. Re-run to update. Confirm with `hermes skills list`, the Spuree skills should show as `enabled`.
-3. Add the key to Hermes's `.env` file, `~/.hermes/.env` on macOS and Linux, `%LOCALAPPDATA%\hermes\.env` on Windows, creating the file if it doesn't exist: `SPUREE_API_KEY=<your-api-key>`. Use the `.env` file, not a shell variable. The desktop app starts its agent with its own environment, so shell exports and Windows User-scope variables never reach it. The `.env` file is read on every surface. For a CLI-only session a shell export also works.
-4. Restart Hermes: start a new CLI session, or fully quit the desktop app **including the system tray icon** and relaunch it.
-5. Verify: ask *"List my Spuree projects"*. The agent should call `https://data.spuree.com/api/v1/projects` with the `X-API-Key` header and show your projects.
+3. Review the installed SKILL.md files before use, treat third-party skills as untrusted and read them before enabling.
+4. Add the key to Hermes's `.env` file, `~/.hermes/.env` on macOS and Linux, `%LOCALAPPDATA%\hermes\.env` on Windows, creating the file if it doesn't exist: `SPUREE_API_KEY=<your-api-key>`. On macOS and Linux restrict access to it: `chmod 600 ~/.hermes/.env` (on Windows, `%LOCALAPPDATA%` is already per-user). Use the `.env` file, not a shell variable. The desktop app starts its agent with its own environment, so shell exports and Windows User-scope variables never reach it. The `.env` file is read on every surface. For a CLI-only session a shell export also works, but if the same variable is set in both, the `.env` value wins: Hermes loads `.env` over existing shell exports, so a stale key in `.env` shadows a corrected export.
+5. Restart Hermes: start a new CLI session, or fully quit the desktop app **including the system tray icon** and relaunch it.
+6. Verify: ask *"List my Spuree projects"*. The agent should call `https://data.spuree.com/api/v1/projects` with the `X-API-Key` header and show your projects.
 
 ## Using the connector
 
@@ -196,7 +197,7 @@ If both headers are sent, the JWT wins. Refresh tokens are single-use — always
 
 - The key is shown **once**, at creation. Save it immediately.
 - Keep it in an environment variable (`SPUREE_API_KEY`) — never paste it into a chat conversation, prompt, or log.
-- If a key **is** ever pasted into a chat, treat it as exposed: create a new key, update every place the old one is stored, then revoke the old one. Places to check: your shell environment or profile, client/environment secrets (e.g. a Codex environment secret), and on Windows the persisted User-scope variable — it lives in the registry (`HKCU\Environment`) and survives until you remove or replace it: `[Environment]::SetEnvironmentVariable("SPUREE_API_KEY", $null, "User")` deletes it.
+- If a key **is** ever pasted into a chat, treat it as exposed: create a new key, update every place the old one is stored, then revoke the old one. Places to check: your shell environment or profile, client/environment secrets (e.g. a Codex environment secret), Hermes's `.env` file (`~/.hermes/.env`; Windows: `%LOCALAPPDATA%\hermes\.env`), and on Windows the persisted User-scope variable — it lives in the registry (`HKCU\Environment`) and survives until you remove or replace it: `[Environment]::SetEnvironmentVariable("SPUREE_API_KEY", $null, "User")` deletes it.
 - Keys are user-scoped and grant the full V1 surface for your user, optionally restricted to specific organizations at creation time.
 - Revoke a key you no longer need at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys) or with `DELETE /v1/api-keys/{key_id}` (JWT Bearer required).
 
