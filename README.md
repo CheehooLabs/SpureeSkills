@@ -36,7 +36,7 @@ Connect Claude Code, Claude Code Web & Cowork, ChatGPT, Codex, or OpenClaw — v
 | [Getting Started](./getting-started/SKILL.md) | Learn what Spuree can do and complete a safe guided first run |
 | [Authentication](./authentication/SKILL.md) | Obtain JWT tokens, manage API keys |
 | [Project Management](./project-management/SKILL.md) | Create, list, update, delete, and share projects; browse contents |
-| [Folder Management](./folder-management/SKILL.md) | List recent folders across projects; create, update, delete, browse, and download folder content |
+| [Folder Management](./folder-management/SKILL.md) | Find canonical folders in one bounded call, list recent folders, and create, update, delete, browse, or download folder content |
 | [File Management](./file-management/SKILL.md) | Get, create, upload, update, and delete files with checksum-verified uploads (includes name search) |
 | [File Comments](./file-comment/SKILL.md) | Add, list, resolve, update, and delete line-anchored review comments on files, with threaded replies and @mentions |
 | [Project Invitations](./project-invitation/SKILL.md) | Manage sharing invitations for non-workspace members |
@@ -51,3 +51,28 @@ All skills use the V1 API. Two authentication methods are supported:
 | API key | `X-API-Key: <key>` | Automation and long-lived access |
 
 See the [Authentication skill](./authentication/SKILL.md) for details on obtaining tokens and managing API keys.
+
+## Contract checks and diagnostics
+
+The folder-discovery contract is checked offline so documentation drift fails
+before release. The guard pins exact endpoint headings, ordered query
+parameters (types, required flags, defaults, enums, and bounds), canonical
+context object shapes, response field names and types, closed response enums,
+status codes, and bounded fallback behavior:
+
+```bash
+node scripts/check-folder-discovery-contract.mjs
+node --test test/*.test.mjs
+```
+
+To diagnose duplicate public and plugin skill copies without changing or
+deleting any installation, run:
+
+```bash
+node scripts/diagnose-spuree-skill-copies.mjs
+node scripts/diagnose-spuree-skill-copies.mjs --json
+```
+
+The diagnostic reports paths, SHA-256 hashes, catalog scan order, and plugin
+namespace/version metadata. Scan order is informational; the active client owns
+runtime precedence when duplicate unprefixed skill names exist.

@@ -366,7 +366,7 @@ Only users with access to the file can be mentioned; tokens for other users are 
 
 1. Read the file content (**file-management** skill: `GET /v1/files/{fileId}/content`).
 2. Leave comments on the lines that need work: `POST /v1/files/{fileId}/comments` with `startLine`/`endLine`/`sourceText`.
-3. Share the file link so the author sees the feedback in Studio: `https://studio.spuree.com/file/{fileId}`.
+3. Share the file link so the author sees the feedback in Studio: `https://studio.spuree.com/files/{fileId}`.
 
 ### Resolve Feedback After a Revision
 

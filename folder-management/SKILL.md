@@ -1,6 +1,6 @@
 ---
 name: folder-management
-description: List recent folders across projects; create, update, delete, and browse folders (sessions), including assets, files, and batch downloads
+description: Find folders by name, list recent folders across projects, and create, update, delete, or browse folders (sessions), including their assets and files
 ---
 
 # Folder Management
@@ -12,6 +12,7 @@ Spuree is an agent-friendly cloud storage. Projects contain folders (nestable) a
 Use this skill when an agent needs to:
 
 - List recently created or updated folders across all accessible projects
+- Find a named folder with bounded search rather than project-tree traversal
 - Create, rename, move, or delete folders in a project
 - Browse a folder's contents (sub-folders, entities, files)
 - List assets or files within a folder
@@ -37,6 +38,7 @@ See the **authentication** skill for obtaining tokens and managing API keys.
 
 | Operation | Base URL |
 | --- | --- |
+| Named-folder discovery | `https://data.spuree.com/api/v1/search/folders` |
 | Cross-project folder listing | `https://data.spuree.com/api/v1/folders` |
 | Folder CRUD and child browsing | `https://data.spuree.com/api/v1/sessions` |
 
@@ -73,6 +75,148 @@ Entities represent assets and have one of these types:
 `character`, `motion`, `prop`, `environment`, `visdev`, `pose`
 
 ## Endpoints
+
+### GET /v1/search/folders
+
+<!-- spuree-agent
+surfaces: ["local", "desktop", "backend", "hosted-web"]
+webSafe: true
+-->
+
+Find existing project folders in one bounded request. The Search service runs
+direct folder-name and contained-file evidence branches concurrently under the
+same caller scope and eight-second ceiling, then returns deduplicated canonical
+folders. Use this endpoint first for a named-folder request; do not enumerate
+projects or recursively browse children to reproduce it client-side.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `q` | string | Yes | — | Nonblank natural-language folder query (1–255 characters). |
+| `workspaceId` | string | No | — | Restrict to one workspace already accessible to the caller. |
+| `projectId` | string | No | — | Restrict to one project already accessible to the caller. |
+| `limit` | integer | No | 5 | Maximum canonical candidates (1–10). |
+
+**Response:**
+
+```json
+{
+  "data": [
+    {
+      "folder": { "id": "64a7b8c9d1e2f3a4b5c6d7e8", "name": "Phase 0" },
+      "project": { "id": "64a7b8c9d1e2f3a4b5c6d7d0", "name": "PLOCAN" },
+      "breadcrumb": [
+        { "id": "64a7b8c9d1e2f3a4b5c6d7d0", "name": "PLOCAN", "sessionType": "creative_project" },
+        { "id": "64a7b8c9d1e2f3a4b5c6d7d8", "name": "Works", "sessionType": "session" },
+        { "id": "64a7b8c9d1e2f3a4b5c6d7e8", "name": "Phase 0", "sessionType": "session" }
+      ],
+      "matchStrength": "strong",
+      "reasonCodes": ["direct_folder_name", "path_token_match"],
+      "evidence": {
+        "directMatchCount": 1,
+        "childFileCount": 0,
+        "childFilenameCount": 0,
+        "childContentCount": 0
+      }
+    }
+  ],
+  "count": 1,
+  "status": "complete",
+  "partial": false,
+  "degradedBranches": [],
+  "branchStatus": [
+    { "branch": "direct_folder_name", "status": "ok" },
+    { "branch": "file_evidence", "status": "ok" }
+  ]
+}
+```
+
+The documented response schema is exact:
+
+| Object | Field | Type |
+| --- | --- | --- |
+| `envelope` | `data` | array |
+| `envelope` | `count` | integer |
+| `envelope` | `status` | string |
+| `envelope` | `partial` | boolean |
+| `envelope` | `degradedBranches` | string[] |
+| `envelope` | `branchStatus` | array |
+| `result` | `folder` | object |
+| `result` | `project` | object |
+| `result` | `breadcrumb` | array |
+| `result` | `matchStrength` | string |
+| `result` | `reasonCodes` | string[] |
+| `result` | `evidence` | object |
+| `folder` | `id` | string |
+| `folder` | `name` | string |
+| `project` | `id` | string |
+| `project` | `name` | string |
+| `breadcrumb[]` | `id` | string |
+| `breadcrumb[]` | `name` | string |
+| `breadcrumb[]` | `sessionType` | string |
+| `evidence` | `directMatchCount` | integer |
+| `evidence` | `childFileCount` | integer |
+| `evidence` | `childFilenameCount` | integer |
+| `evidence` | `childContentCount` | integer |
+| `branchStatus[]` | `branch` | string |
+| `branchStatus[]` | `status` | string |
+
+The response enums are also closed sets:
+
+| Field | Exact values |
+| --- | --- |
+| `status` | `complete` \| `partial` |
+| `degradedBranches[]` | `direct_folder_name` \| `file_evidence` |
+| `matchStrength` | `exact` \| `strong` \| `supporting` |
+| `reasonCodes[]` | `exact_folder_name` \| `direct_folder_name` \| `path_token_match` \| `child_filename` \| `child_content` |
+| `breadcrumb[].sessionType` | `creative_project` \| `session` |
+| `branchStatus[].branch` | `direct_folder_name` \| `file_evidence` |
+| `branchStatus[].status` | `ok` \| `timeout` \| `error` \| `skipped` |
+
+`breadcrumb` is ordered from the creative-project root through the matched
+folder. `matchStrength` is exactly `exact`, `strong`, or `supporting`; it is a
+stable qualitative tier, not a probability. `reasonCodes` may contain
+`exact_folder_name`, `direct_folder_name`, `path_token_match`,
+`child_filename`, and `child_content`.
+
+Evidence is count-only. CheehooData does not return matching child file names,
+file IDs, snippets, bodies, raw Atlas scores, or navigation URLs from this
+endpoint. A hosted Studio tool may add `webUrl` fields; otherwise construct
+`https://studio.spuree.com/folders/{folderId}` and
+`https://studio.spuree.com/projects/{projectId}` from the canonical IDs.
+
+`status: "partial"` and `partial: true` mean exactly one search branch degraded;
+inspect `degradedBranches` and `branchStatus`, and present the surviving
+candidates as partial. Each `branchStatus[].status` is exactly `ok`, `timeout`,
+`error`, or `skipped`: `ok` means the bounded branch completed (even with no
+matches), `timeout`/`error` identify degradation, and `skipped` means no search
+ran because the caller's narrowed scope was empty. Service construction, scope
+resolution, both evidence branches, and canonical hydration share one
+eight-second ceiling. If that request budget expires, both branches are
+unavailable, or canonical hydration fails, the request returns 503 instead of
+silently traversing project trees.
+
+**Status Codes:**
+
+| Code | Description |
+| --- | --- |
+| 200 | Complete or explicitly partial canonical candidates returned |
+| 400 | Query has no safe high-signal term or exceeds the bounded search breadth threshold |
+| 401 | Invalid or expired credential |
+| 403 | OAuth credential lacks the `read` scope |
+| 422 | Missing/blank query, invalid limit, or malformed narrowing ID |
+| 500 | Non-transient search or canonical-storage failure |
+| 503 | Shared request deadline expires, both evidence branches are unavailable, or canonical hydration fails |
+
+**Example:**
+
+```bash
+curl "https://data.spuree.com/api/v1/search/folders?q=PLOCAN%20Phase%200%20and%20A%20Works&limit=5" \
+  -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
+```
+
+---
 
 ### GET /v1/folders
 
@@ -375,7 +519,8 @@ List a folder's immediate contents — sub-folders, asset entities, and files. U
 }
 ```
 
-> **Parsing note:** Read the `items` array. **Do not** look for separate top-level `sessions`, `entities`, or `files` arrays — older deployments returned that shape, but the current API returns the unified `items` list, so a parser expecting the old shape sees an empty result and wrongly concludes the folder is empty. For backward compatibility, a robust parser can read `items` first and fall back to the legacy `sessions`/`entities`/`files` arrays only when `items` is absent.
+> **Parsing note:** Read the required top-level `items` array. Do not parse this
+> endpoint as separate collections; an empty folder is exactly `{ "items": [] }`.
 
 **Item Types** (selected by `type`):
 
@@ -641,7 +786,68 @@ folders, and do not recurse through every project's children.
 GET /v1/folders?sortBy=createdAt&sortOrder=desc&limit=20
 ```
 
-### Navigate a Project's Folder Structure
+### Find a Named Folder (Bounded Search-First Recipe)
+
+Use search for requests such as “find the PLOCAN Phase 0 and A Works folder.”
+Do not list every project or walk child endpoints to discover a folder by name.
+
+1. Make the preferred one-call discovery request with the user's concise
+   natural-language folder intent:
+
+   ```text
+   GET /v1/search/folders?q={encodedNaturalLanguageQuery}&limit=5
+   ```
+
+   Use the returned canonical `folder`, `project`, and root-to-folder
+   `breadcrumb`. Preserve explicit partial status. Return or ask the user to
+   choose among those candidates; do not perform client-side traversal.
+
+2. **Compatibility fallback only:** if an older deployment does not expose
+   `GET /v1/search/folders`, use the following fixed two-search sequence. First
+   separate the likely leaf-folder stem and requested leaf labels from hierarchy
+   qualifiers. In the example above, search for `Phase`, retain the requested
+   labels `0` and `A`, and use `PLOCAN` / `Works` as hierarchy qualifiers. Rank
+   canonical `Phase 0` and `Phase A` results beneath `PLOCAN / Works`; do not
+   treat `Works` as the leaf. Do not send request verbs or the entire
+   natural-language sentence as `{encodedQuery}`.
+
+   Search folder name rows directly:
+
+   ```text
+   GET /v1/search?q={encodedQuery}&type=folder&searchIn=name&matchMode=all&limit=50
+   ```
+
+   Read the grouped `{ data, count, cursor }` response. Rank an exact
+   case-insensitive `sessionName` match first, then normalized all-term name
+   matches, then the API relevance order. A folder result's canonical Studio
+   URL is `https://studio.spuree.com/folders/{sourceId}`.
+
+   Only when the direct results are empty or still ambiguous and the request
+   contains useful file/content terms, make **one** evidence fallback request:
+
+   ```text
+   GET /v1/search?q={encodedQuery}&type=file&searchIn=all&matchMode=all&limit=50
+   ```
+
+   Use concise evidence terms, not request verbs. Group the returned file
+   results by their containing `sessionId`; use the number and relevance of
+   matching files only as supporting evidence. Promote a group only when its
+   result context identifies that `sessionId` as a folder, and skip
+   project-root files. Its canonical Studio URL is
+   `https://studio.spuree.com/folders/{sessionId}`.
+
+   Return the best candidates with their project context and evidence. If the
+   result is still ambiguous, ask the user to choose. Stop after the direct
+   search and the single fallback: do not enumerate projects, call child
+   endpoints, or recursively traverse folders for named-folder discovery.
+
+`GET /v1/folders` is for globally sorted listing such as “recent folders”; it
+is not the fallback for a name query.
+
+### Browse a Known Folder
+
+Use child endpoints only after the user supplied or selected an ID. They are
+for inspecting a known container, not for finding a named folder.
 
 1. **Get project children** (via **project-management** skill):
 
@@ -655,7 +861,7 @@ GET /v1/folders?sortBy=createdAt&sortOrder=desc&limit=20
    GET /v1/sessions/{folderId}/children → { items: [...] }
    ```
 
-3. **Repeat** to go deeper into sub-folders.
+3. Follow a returned sub-folder ID only when the user asks to inspect it.
 
 ### Create a Folder Structure
 
@@ -688,7 +894,7 @@ POST /v1/sessions { name: "Heroes", parentSessionId: "folder1" }
 
 ### Agent Workflow: Asset Discovery
 
-1. **Browse project** → find the folder containing assets
+1. **Find the folder** → use the bounded search-first recipe above
 2. **Get assets** → `GET /v1/sessions/{folderId}/assets`
 3. **Get files** → for each asset, list its files
 4. **Download** → batch download with `POST /v1/sessions/files/download/urls`
@@ -700,11 +906,10 @@ After creating or finding resources, you can give the user a clickable link to v
 | Resource | URL Pattern |
 | --- | --- |
 | Project | `https://studio.spuree.com/projects/{projectId}` |
-| Folder (top-level) | `https://studio.spuree.com/projects/{projectId}/folders/{folderId}` |
-| Folder (nested) | `https://studio.spuree.com/projects/{projectId}/folders/{parentId}/{childId}` |
-| File | `https://studio.spuree.com/file/{fileId}` |
+| Folder | `https://studio.spuree.com/folders/{folderId}` |
+| File | `https://studio.spuree.com/files/{fileId}` |
 
-Folders support up to 5 levels of nesting. Each level appends another ID segment: `.../folders/{level1}/{level2}/{level3}/...`
+Studio resource URLs use only the target ID, regardless of folder depth.
 
 ## Error Handling
 
