@@ -3,11 +3,11 @@
 There are two ways to hook an AI tool up to Spuree, and they suit different clients:
 
 - **Connector (OAuth MCP)** — paste a URL into your client, sign in through your browser, and approve access once; from then on your AI tool can work with your Spuree projects directly. (Behind the scenes: MCP is the standard protocol AI tools use to talk to services, and OAuth is the browser sign-in that authorizes it.) No keys to copy, revocable from your Spuree account at any time. Best for hosted and chat-style clients (claude.ai surfaces, ChatGPT). The server URL for Claude surfaces is `https://spuree.com/mcp`; ChatGPT uses its own URL (see [ChatGPT](#chatgpt)).
-- **Skills + API key** — install the [Spuree skill docs](https://github.com/CheehooLabs/SpureeSkills) into your agent and authenticate against the REST API with an API key. Best for CLI agents (Codex, OpenClaw, local Claude Code) and for the full V1 API surface, including binary file uploads, which the hosted connector does not offer.
+- **Skills + API key** — install the [Spuree skill docs](https://github.com/CheehooLabs/SpureeSkills) into your agent and authenticate against the REST API with an API key. Best for CLI agents (Codex, OpenClaw, Hermes, local Claude Code) and for the full V1 API surface, including binary file uploads, which the hosted connector does not offer.
 
 **Before you start:** you need a Spuree account — sign up at [studio.spuree.com](https://studio.spuree.com). Three domains appear in this guide: **spuree.com** is the main site, **studio.spuree.com** is the web app (and where the consent screen you'll approve is shown), and **data.spuree.com** is the API host.
 
-> **Note:** The Spuree connector is currently in early access. If the OAuth flow is not yet enabled for your account and your client supports skills (Claude Code, Codex, OpenClaw), use the skills + API key path in the meantime. ChatGPT has no skills path — if the connector isn't enabled for your account yet, wait for general availability.
+> **Note:** The Spuree connector is currently in early access. If the OAuth flow is not yet enabled for your account and your client supports skills (Claude Code, Codex, OpenClaw, Hermes), use the skills + API key path in the meantime. ChatGPT has no skills path — if the connector isn't enabled for your account yet, wait for general availability.
 
 ## Which path should I use?
 
@@ -18,6 +18,7 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 | ChatGPT (web) | ✅ read-only | — | Paid plan required; uses its own server URL (see [ChatGPT](#chatgpt)); exposes `search`, `fetch`, and `getting_started` only |
 | Codex (CLI / IDE) | — | ✅ | Codex's MCP OAuth login isn't compatible with Spuree's OAuth server today |
 | OpenClaw | — | ✅ | The Spuree MCP endpoint is OAuth-only; OpenClaw's native MCP client doesn't support OAuth flows |
+| Hermes Agent (CLI / desktop) | — | ✅ | Hermes's MCP OAuth login requires dynamic client registration, which Spuree's OAuth server doesn't offer |
 
 ✅ = supported · ◐ = possible but not the recommended path · — = not supported
 
@@ -96,6 +97,18 @@ Skills are documentation, not MCP tools — nothing new appears in OpenClaw's to
 4. Provide the key. Simplest: set `SPUREE_API_KEY` in the environment of the process that runs OpenClaw — your shell profile, container env, or service definition. For example: `SPUREE_API_KEY="<your-key>" <your OpenClaw start command>`. Alternative: set it per skill in `~/.openclaw/openclaw.json` under `skills.entries`, where each entry key is a skill's directory name (e.g. `authentication`): `{ "skills": { "entries": { "authentication": { "env": { "SPUREE_API_KEY": "<your-key>" } } } } }` — OpenClaw injects it per agent run if not already set. The environment-level approach covers every Spuree skill with one setting.
 5. Start a **new** session — the eligible-skills snapshot is taken at session start.
 6. Verify: ask *"List my Spuree projects"*. The agent should call `https://data.spuree.com/api/v1/projects` with the `X-API-Key` header and show your projects.
+
+### Hermes Agent
+
+The connector path is not available for Hermes today (Hermes's MCP OAuth login requires dynamic client registration, which Spuree's OAuth server doesn't offer). Use skills + an API key:
+
+The Hermes CLI and the Hermes Desktop app share one home directory (`~/.hermes` on macOS and Linux, `%LOCALAPPDATA%\hermes` on Windows), so the steps below cover both.
+
+1. Create a Spuree account at [studio.spuree.com](https://studio.spuree.com) and create an API key at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys). **Save it immediately, it's shown only once.**
+2. Install the skills globally: `npx skills add https://github.com/CheehooLabs/SpureeSkills -a hermes-agent -g` (the agent name is `hermes-agent`, not `hermes`). This installs into `skills/` under the Hermes home, where every Hermes surface reads them. Re-run to update. Confirm with `hermes skills list`, the Spuree skills should show as `enabled`.
+3. Add the key to Hermes's `.env` file, `~/.hermes/.env` on macOS and Linux, `%LOCALAPPDATA%\hermes\.env` on Windows, creating the file if it doesn't exist: `SPUREE_API_KEY=<your-api-key>`. Use the `.env` file, not a shell variable. The desktop app starts its agent with its own environment, so shell exports and Windows User-scope variables never reach it. The `.env` file is read on every surface. For a CLI-only session a shell export also works.
+4. Restart Hermes: start a new CLI session, or fully quit the desktop app **including the system tray icon** and relaunch it.
+5. Verify: ask *"List my Spuree projects"*. The agent should call `https://data.spuree.com/api/v1/projects` with the `X-API-Key` header and show your projects.
 
 ## Using the connector
 
@@ -211,6 +224,8 @@ If your projects come back as JSON, you're connected.
 | Repeated auth failures | Auth endpoints are rate-limited and repeated failed logins temporarily lock the account | Wait a few minutes and retry; slow down automated login attempts |
 | Truncated results on large listings in Claude Code | MCP tool output is capped at 25,000 tokens by default | Raise the cap with the `MAX_MCP_OUTPUT_TOKENS` environment variable, or narrow the request |
 | Skills installed, but the agent doesn't see them | The install didn't target your client — Claude Code reads `.claude/skills/`, which is only created when you select **Claude Code** in the installer's agent picker — or the agent was launched in a different folder than the install (project-level installs are only visible from that folder, for every client) | Re-run `npx skills add …` and select your client in the picker; launch the agent in the folder you installed into |
+| Hermes: the key works in the CLI, but the desktop app says no key is set | The desktop agent doesn't inherit shell exports or Windows User-scope variables | Put the key in Hermes's `.env` file (`~/.hermes/.env`, Windows: `%LOCALAPPDATA%\hermes\.env`), quit the desktop app including the tray icon, relaunch |
+| Hermes MCP server entry fails with *"Invalid registration response"* | Spuree's OAuth server has no dynamic client registration | Remove the server entry and use the skills + API key path |
 | `401 {"detail": "Invalid API key"}` on a V1 call | The key reached the API but doesn't exist or was revoked (a rotated-out key in a stale environment is the classic cause) | Create a new key at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys), update it everywhere it's stored, and restart the client |
 | `401 "Authentication required…"` on a V1 call | No credential was sent at all — `SPUREE_API_KEY` isn't visible to the client's process | Set the variable and **fully restart** the client (environment variables are read at process start) |
 
