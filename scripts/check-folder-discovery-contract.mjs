@@ -870,7 +870,7 @@ function validateBoundedRecipe(folderMarkdown, errors) {
   addError(
     errors,
     /tool registry does not contain `folder_find`/.test(section) &&
-      /returns 404 or 405/.test(section),
+      /returns 404, 405, or 501/.test(section),
     "folder-management: compatibility fallback must require confirmed endpoint absence",
   );
   addError(
@@ -979,7 +979,7 @@ export function validateFolderDiscoveryContract(documents) {
   addError(
     errors,
     /tool registry lacks `folder_find`/.test(documents.gettingStarted) &&
-      /endpoint returns 404 or\s+405/.test(documents.gettingStarted) &&
+      /endpoint returns 404,\s+405, or 501/.test(documents.gettingStarted) &&
       /Do not fall back after another response or transport failure/.test(documents.gettingStarted),
     "getting-started: compatibility fallback must be absence-only",
   );

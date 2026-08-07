@@ -804,7 +804,7 @@ Do not list every project or walk child endpoints to discover a folder by name.
 
 2. **Compatibility fallback only:** use the following fixed legacy sequence
    only when the client tool registry does not contain `folder_find`, or an HTTP
-   request to `GET /v1/search/folders` returns 404 or 405. Those conditions
+   request to `GET /v1/search/folders` returns 404, 405, or 501. Those conditions
    confirm that the endpoint is absent. Do not fall back after a 400, 401, 403,
    422, 500, or 503 response, a timeout, or a network failure; surface that
    error instead.

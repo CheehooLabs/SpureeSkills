@@ -427,7 +427,7 @@ test("rejects fallback after runtime failures or through a post-1020-only match 
     changed("folder", (markdown) =>
       markdown
         .replace(
-          "only when the client tool registry does not contain `folder_find`, or an HTTP\n   request to `GET /v1/search/folders` returns 404 or 405",
+          "only when the client tool registry does not contain `folder_find`, or an HTTP\n   request to `GET /v1/search/folders` returns 404, 405, or 501",
           "whenever folder discovery fails",
         )
         .replace(
@@ -450,7 +450,7 @@ test("rejects onboarding guidance that falls back without confirmed absence", ()
     changed("gettingStarted", (markdown) =>
       markdown
         .replace(
-          "Only when the tool registry lacks `folder_find`, or the endpoint returns 404 or\n405",
+          "Only when the tool registry lacks `folder_find`, or the endpoint returns 404,\n405, or 501",
           "Whenever folder discovery fails",
         )
         .replace(

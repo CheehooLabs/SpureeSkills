@@ -78,8 +78,8 @@ internal creator capabilities such as motion or video generation.
 
 If the user already supplied a name or topic, prefer a read-only search. For a
 folder request, use the one-call `folder_find` recipe in **folder-management**.
-Only when the tool registry lacks `folder_find`, or the endpoint returns 404 or
-405, use its fixed legacy generic-search fallback with `type=folder` and
+Only when the tool registry lacks `folder_find`, or the endpoint returns 404,
+405, or 501, use its fixed legacy generic-search fallback with `type=folder` and
 `searchIn=name`. Do not fall back after another response or transport failure.
 Otherwise, use a small project list as a generic connection check:
 
