@@ -659,14 +659,22 @@ function validateSearchContract(markdown, errors) {
   addError(
     errors,
     /Replay the original `q` and every corpus-shaping filter/.test(section) &&
-      /malformed or mismatched bound cursor returns 422/.test(section),
+      /malformed, tampered, or mismatched bound\s+cursor returns 422/.test(section),
     "file-management: cursor replay and mismatch semantics are missing",
   );
   addError(
     errors,
-    /Pre-`matchMode` legacy cursors are treated as unbound `any`-mode compatibility\s+tokens/.test(section) &&
-      /regardless of a re-sent `matchMode`/.test(section),
-    "file-management: legacy cursor compatibility must be explicit",
+    /Newly issued HMAC-signed `v1` cursors/.test(section) &&
+      /malformed, tampered, or mismatched bound\s+cursor returns 422/.test(section),
+    "file-management: signed cursor integrity semantics are missing",
+  );
+  addError(
+    errors,
+    /Unsigned pre-v1 cursors are treated as unbound `any`-mode compatibility tokens/.test(section) &&
+      /regardless of a re-sent `matchMode`/.test(section) &&
+      /only until \*\*2026-09-07 00:00 UTC\*\*/.test(section) &&
+      /At and after the sunset,\s+every unsigned cursor is rejected/.test(section),
+    "file-management: bounded legacy cursor migration must be explicit",
   );
   addError(
     errors,

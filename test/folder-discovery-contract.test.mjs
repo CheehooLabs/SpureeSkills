@@ -287,21 +287,34 @@ test("rejects missing cursor replay and mismatch guidance", () => {
     changed("file", (markdown) =>
       markdown
         .replace("Replay the original `q` and every corpus-shaping filter", "Pass the cursor")
-        .replace("A malformed or mismatched bound cursor returns 422.", "Retry on cursor errors."),
+        .replace("A malformed, tampered, or mismatched bound\ncursor returns 422.", "Retry on cursor errors."),
     ),
   );
   assert(result.includes("file-management: cursor replay and mismatch semantics are missing"));
 });
 
-test("rejects hidden legacy-cursor compatibility semantics", () => {
+test("rejects missing signed cursor integrity semantics", () => {
   const result = validateFolderDiscoveryContract(
     changed("file", (markdown) =>
       markdown
-        .replace("Pre-`matchMode` legacy cursors are treated as unbound `any`-mode compatibility", "Legacy cursors work as")
-        .replace("regardless of a re-sent `matchMode`", "and inherit every re-sent match mode"),
+        .replace("Newly issued HMAC-signed `v1` cursors", "Newly issued cursors")
+        .replace("malformed, tampered, or mismatched bound", "malformed or mismatched bound"),
     ),
   );
-  assert(result.includes("file-management: legacy cursor compatibility must be explicit"));
+  assert(result.includes("file-management: signed cursor integrity semantics are missing"));
+});
+
+test("rejects an unbounded legacy-cursor migration", () => {
+  const result = validateFolderDiscoveryContract(
+    changed("file", (markdown) =>
+      markdown
+        .replace("Unsigned pre-v1 cursors are treated as unbound `any`-mode compatibility tokens", "Legacy cursors work as compatibility tokens")
+        .replace("regardless of a re-sent `matchMode`", "and inherit every re-sent match mode")
+        .replace("only until **2026-09-07 00:00 UTC**", "during migration")
+        .replace("At and after the sunset,\nevery unsigned cursor is rejected", "Unsigned cursors may remain accepted"),
+    ),
+  );
+  assert(result.includes("file-management: bounded legacy cursor migration must be explicit"));
 });
 
 test("rejects incomplete generic search status documentation", () => {
