@@ -4,7 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { discoverSkillCopies } from "../scripts/diagnose-spuree-skill-copies.mjs";
+import {
+  discoverSkillCopies,
+  TARGET_SKILLS,
+} from "../scripts/diagnose-spuree-skill-copies.mjs";
 
 async function writeSkill(root, skill, content) {
   const skillDirectory = path.join(root, skill);
@@ -13,6 +16,18 @@ async function writeSkill(root, skill, content) {
   await writeFile(skillPath, content);
   return skillPath;
 }
+
+test("covers all seven public Spuree skills", () => {
+  assert.deepEqual(TARGET_SKILLS, [
+    "authentication",
+    "file-comment",
+    "file-management",
+    "folder-management",
+    "getting-started",
+    "project-invitation",
+    "project-management",
+  ]);
+});
 
 test("reports distinct direct and plugin copies without modifying them", async (context) => {
   const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "spuree-copy-diagnostic-"));
@@ -46,7 +61,12 @@ test("reports distinct direct and plugin copies without modifying them", async (
     })),
   );
 
-  const report = await discoverSkillCopies({ cwd: repository, home, codexHome });
+  const report = await discoverSkillCopies({
+    target: repository,
+    sourceRoot: repository,
+    home,
+    codexHome,
+  });
   assert.equal(report.readOnly, true);
   assert.match(report.resolutionNote, /runtime skill precedence/);
 
@@ -68,9 +88,14 @@ test("reports distinct direct and plugin copies without modifying them", async (
   assert.deepEqual(report.duplicates, [
     {
       skill: "file-management",
-      installedCopies: 3,
-      distinctHashes: 3,
-      paths: copies.filter((copy) => copy.location !== "repository").map((copy) => copy.path),
+      exposedName: "file-management",
+      installedCopies: 2,
+      distinctHashes: 2,
+      paths: copies
+        .filter((copy) =>
+          copy.location !== "source-reference" && copy.namespace === null
+        )
+        .map((copy) => copy.path),
     },
   ]);
 
@@ -95,7 +120,12 @@ test("reports a direct skill installed through a directory symlink without chang
   const linkPath = path.join(directRoot, "folder-management");
   await symlink(path.dirname(targetFile), linkPath, "dir");
 
-  const report = await discoverSkillCopies({ cwd: repository, home, codexHome });
+  const report = await discoverSkillCopies({
+    target: repository,
+    sourceRoot: repository,
+    home,
+    codexHome,
+  });
   const copy = report.copies.find(
     (entry) => entry.skill === "folder-management" && entry.location === "user-agents",
   );
@@ -104,6 +134,103 @@ test("reports a direct skill installed through a directory symlink without chang
   assert.equal(copy.path, path.join(linkPath, "SKILL.md"));
   assert.equal(await readlink(linkPath), path.dirname(targetFile));
   assert.equal(await readFile(targetFile, "utf8"), "linked contract\n");
+});
+
+test("keeps source, project, and user roots distinct for a repository under home", async (context) => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "spuree-root-classification-"));
+  context.after(() => rm(temporaryRoot, { force: true, recursive: true }));
+
+  const home = path.join(temporaryRoot, "home");
+  const repository = path.join(home, "work", "repository");
+  const sourceRoot = path.join(temporaryRoot, "spuree-source");
+  const codexHome = path.join(home, ".codex");
+  await mkdir(path.join(repository, ".git"), { recursive: true });
+
+  const sourcePath = await writeSkill(sourceRoot, "folder-management", "source\n");
+  const projectPath = await writeSkill(
+    path.join(repository, ".agents", "skills"),
+    "folder-management",
+    "project\n",
+  );
+  const userPath = await writeSkill(
+    path.join(home, ".agents", "skills"),
+    "folder-management",
+    "user\n",
+  );
+
+  const report = await discoverSkillCopies({
+    target: repository,
+    sourceRoot,
+    home,
+    codexHome,
+  });
+  const byPath = new Map(
+    report.copies
+      .filter((copy) => copy.skill === "folder-management")
+      .map((copy) => [copy.path, copy]),
+  );
+
+  assert.equal(report.roots.target, repository);
+  assert.equal(report.roots.sourceRoot, sourceRoot);
+  assert.equal(byPath.get(sourcePath)?.location, "source-reference");
+  assert.equal(byPath.get(projectPath)?.location, "project-agents");
+  assert.equal(byPath.get(userPath)?.location, "user-agents");
+});
+
+test("discovers every documented client root", async (context) => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "spuree-client-roots-"));
+  context.after(() => rm(temporaryRoot, { force: true, recursive: true }));
+
+  const repository = path.join(temporaryRoot, "repository");
+  const sourceRoot = path.join(temporaryRoot, "source");
+  const home = path.join(temporaryRoot, "home");
+  const codexHome = path.join(home, ".codex");
+  const hermesHome = path.join(temporaryRoot, "hermes-home");
+  await mkdir(path.join(repository, ".git"), { recursive: true });
+  await Promise.all(
+    TARGET_SKILLS.map((skill) => writeSkill(sourceRoot, skill, `source ${skill}\n`)),
+  );
+
+  const expectedLocations = new Map();
+  expectedLocations.set(
+    await writeSkill(path.join(repository, ".claude", "skills"), "file-comment", "project claude\n"),
+    "project-claude",
+  );
+  expectedLocations.set(
+    await writeSkill(path.join(repository, "skills"), "authentication", "project openclaw\n"),
+    "project-workspace",
+  );
+  expectedLocations.set(
+    await writeSkill(path.join(home, ".claude", "skills"), "project-invitation", "user claude\n"),
+    "user-claude",
+  );
+  expectedLocations.set(
+    await writeSkill(path.join(home, ".openclaw", "skills"), "folder-management", "user openclaw\n"),
+    "user-openclaw",
+  );
+  expectedLocations.set(
+    await writeSkill(path.join(hermesHome, "skills"), "getting-started", "user hermes\n"),
+    "user-hermes",
+  );
+
+  const report = await discoverSkillCopies({
+    target: repository,
+    sourceRoot,
+    home,
+    codexHome,
+    hermesHome,
+  });
+  const sourceSkills = report.copies
+    .filter((copy) => copy.location === "source-reference")
+    .map((copy) => copy.skill);
+  assert.deepEqual(sourceSkills, TARGET_SKILLS);
+
+  for (const [skillPath, location] of expectedLocations) {
+    assert.equal(
+      report.copies.find((copy) => copy.path === skillPath)?.location,
+      location,
+    );
+  }
 });
 
 test("discovers a contained symlinked skills root after its target was visited", async (context) => {
@@ -139,7 +266,12 @@ test("discovers a contained symlinked skills root after its target was visited",
   const linkedSkillsRoot = path.join(pluginRoot, "skills");
   await symlink(targetRoot, linkedSkillsRoot, "dir");
 
-  const report = await discoverSkillCopies({ cwd: repository, home, codexHome });
+  const report = await discoverSkillCopies({
+    target: repository,
+    sourceRoot: repository,
+    home,
+    codexHome,
+  });
   const pluginCopies = report.copies.filter(
     (copy) => copy.skill === "file-management" && copy.location === "plugin-cache",
   );
@@ -209,7 +341,12 @@ test("follows one contained plugin-root symlink without escaping or cycling", as
     "dir",
   );
 
-  const report = await discoverSkillCopies({ cwd: repository, home, codexHome });
+  const report = await discoverSkillCopies({
+    target: repository,
+    sourceRoot: repository,
+    home,
+    codexHome,
+  });
   const pluginCopies = report.copies.filter(
     (copy) => copy.skill === "file-management" && copy.location === "plugin-cache",
   );

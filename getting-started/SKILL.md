@@ -78,8 +78,9 @@ internal creator capabilities such as motion or video generation.
 
 If the user already supplied a name or topic, prefer a read-only search. For a
 folder request, use the one-call `folder_find` recipe in **folder-management**.
-Only when an older deployment does not expose that tool, use its fixed generic
-search fallback with `type=folder`, `searchIn=name`, and `matchMode=all`.
+Only when the tool registry lacks `folder_find`, or the endpoint returns 404 or
+405, use its fixed legacy generic-search fallback with `type=folder` and
+`searchIn=name`. Do not fall back after another response or transport failure.
 Otherwise, use a small project list as a generic connection check:
 
 1. Tell the user you will check their Spuree connection.
@@ -106,9 +107,9 @@ the **project-management** skill to show its immediate contents. Continue into a
 known folder with `folder_browse` or **folder-management** only when the user
 asks. If the user gives a folder name instead, prefer the one-call
 `folder_find` workflow documented by **folder-management**. Only an older
-deployment that lacks that endpoint may use its fixed two-search compatibility
-fallback; never enumerate projects or recursively traverse children to discover
-the folder.
+deployment confirmed to lack that endpoint may use its fixed two-search
+compatibility fallback; never enumerate projects or recursively traverse
+children to discover the folder.
 
 On the search/fetch connector, let the user choose a search result and call
 `fetch` to read it.

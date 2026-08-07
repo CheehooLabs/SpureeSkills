@@ -783,8 +783,18 @@ function validateFolderFindContract(markdown, errors) {
   );
   addError(
     errors,
-    /Shared request deadline expires/.test(section),
+    /search_query_too_broad/.test(section),
+    "folder-management: folder_find 400 must identify search_query_too_broad",
+  );
+  addError(
+    errors,
+    /shared request deadline expires/i.test(section),
     "folder-management: folder_find 503 must include the shared request deadline",
+  );
+  addError(
+    errors,
+    /folder_discovery_unavailable/.test(section),
+    "folder-management: folder_find 503 must identify folder_discovery_unavailable",
   );
 }
 
@@ -841,29 +851,64 @@ function validateBoundedRecipe(folderMarkdown, errors) {
   addError(errors, section !== null, "folder-management: missing bounded named-folder recipe");
   if (!section) return;
 
-  const direct = "GET /v1/search?q={encodedQuery}&type=folder&searchIn=name&matchMode=all&limit=50";
-  const evidence = "GET /v1/search?q={encodedQuery}&type=file&searchIn=all&matchMode=all&limit=50";
+  const direct = "GET /v1/search?q={encodedQuery}&type=folder&searchIn=name&limit=50";
+  const evidence = "GET /v1/search?q={encodedQuery}&type=file&searchIn=all&limit=50";
   const oneCall = "GET /v1/search/folders?q={encodedNaturalLanguageQuery}&limit=5";
   addError(errors, count(section, oneCall) === 1, "folder-management: recipe must prefer exactly one folder_find request");
   addError(errors, count(section, direct) === 1, "folder-management: recipe must make one direct folder-name search");
   addError(errors, count(section, evidence) === 1, "folder-management: recipe must define exactly one file-evidence fallback");
   addError(errors, section.indexOf(oneCall) < section.indexOf(direct), "folder-management: folder_find must precede compatibility searches");
   addError(errors, /Compatibility fallback only/.test(section), "folder-management: generic searches must be compatibility-only");
+  addError(
+    errors,
+    /tool registry does not contain `folder_find`/.test(section) &&
+      /returns 404 or 405/.test(section),
+    "folder-management: compatibility fallback must require confirmed endpoint absence",
+  );
+  addError(
+    errors,
+    /Do not fall back after a 400, 401, 403,\s+422, 500, or 503 response, a timeout, or a network failure/.test(section),
+    "folder-management: compatibility fallback must not mask API or transport failures",
+  );
+  addError(
+    errors,
+    /old enough to lack `folder_find` also lacks `matchMode`/.test(section) &&
+      /may\s+not return canonical `container`, `project`, or `breadcrumb` context/.test(section),
+    "folder-management: legacy generic-search limitations must be explicit",
+  );
+  addError(
+    errors,
+    !section.includes("matchMode="),
+    "folder-management: compatibility searches must not require matchMode",
+  );
   addError(errors, /Preserve explicit partial status/.test(section), "folder-management: recipe must preserve folder_find degradation status");
   addError(errors, section.indexOf(direct) < section.indexOf(evidence), "folder-management: direct folder search must precede file evidence");
-  addError(errors, /Group the returned file\s+results by their containing `sessionId`/.test(section), "folder-management: file evidence must be grouped by sessionId");
+  addError(
+    errors,
+    /Build a set of the direct\s+folder results' `sourceId` values/.test(section) &&
+      /Count a file group only when its `sessionId` is in\s+that direct-folder ID set/.test(section) &&
+      /must never introduce a new folder candidate/.test(section),
+    "folder-management: legacy file evidence must only support proven direct folder IDs",
+  );
+  addError(
+    errors,
+    /If direct search\s+returned no folder candidates, stop/.test(section) &&
+      /file evidence cannot establish a folder identity by itself/.test(section),
+    "folder-management: file evidence must not create candidates after an empty direct search",
+  );
   addError(errors, /likely leaf-folder stem/.test(section), "folder-management: recipe must separate the leaf name from hierarchy qualifiers");
   addError(
     errors,
-    /search for `Phase`/.test(section) &&
+    /search for\s+`Phase`/.test(section) &&
       /requested\s+labels `0` and `A`/.test(section) &&
-      /use `PLOCAN` \/ `Works` as hierarchy qualifiers/.test(section) &&
+      /keep `PLOCAN` \/ `Works`\s+only as user-provided qualifiers/.test(section) &&
+      /Do not claim that a result is beneath\s+`PLOCAN \/ Works` unless the response itself supplies canonical context/.test(section) &&
       /do not\s+treat `Works` as the leaf/.test(section),
-    "folder-management: PLOCAN fallback must target Phase 0 and Phase A beneath PLOCAN / Works",
+    "folder-management: PLOCAN fallback must preserve unverified hierarchy qualifiers",
   );
   addError(errors, /Do not\s+send\s+request verbs or the entire\s+natural-language sentence/.test(section), "folder-management: recipe must not submit the whole request as the folder query");
   addError(errors, /single fallback/.test(section), "folder-management: recipe must stop after one fallback");
-  addError(errors, /do not enumerate projects/i.test(section), "folder-management: recipe must prohibit project enumeration");
+  addError(errors, /do not\s+enumerate projects/i.test(section), "folder-management: recipe must prohibit project enumeration");
   addError(errors, /recursively traverse folders/i.test(section), "folder-management: recipe must prohibit recursive traversal");
   addError(errors, !/GET \/v1\/(projects|sessions)\/[^\n]*\/children/.test(section), "folder-management: recipe must not call child endpoints");
 }
@@ -920,8 +965,15 @@ export function validateFolderDiscoveryContract(documents) {
   );
   addError(
     errors,
-    /fixed two-search compatibility\s+fallback/.test(documents.gettingStarted),
+    /fixed two-search\s+compatibility fallback/.test(documents.gettingStarted),
     "getting-started: walkthrough must bound the compatibility fallback",
+  );
+  addError(
+    errors,
+    /tool registry lacks `folder_find`/.test(documents.gettingStarted) &&
+      /endpoint returns 404 or\s+405/.test(documents.gettingStarted) &&
+      /Do not fall back after another response or transport failure/.test(documents.gettingStarted),
+    "getting-started: compatibility fallback must be absence-only",
   );
   addError(errors, !documents.project.includes("browse recursively"), "project-management: recursive discovery instruction is forbidden");
   addError(errors, !documents.folder.includes("Repeat** to go deeper"), "folder-management: unbounded repeat instruction is forbidden");

@@ -389,23 +389,93 @@ test("rejects incomplete folder 400 and 503 causes", () => {
   const result = validateFolderDiscoveryContract(
     changed("folder", (markdown) =>
       markdown
-        .replace("Query has no safe high-signal term or exceeds", "Query exceeds")
-        .replace("Shared request deadline expires", "Both search branches fail"),
+        .replace("query has no safe high-signal term or exceeds", "query exceeds")
+        .replace("shared request deadline expires", "both search branches fail"),
     ),
   );
   assert(result.includes("folder-management: folder_find 400 must document unsafe low-signal queries"));
   assert(result.includes("folder-management: folder_find 503 must include the shared request deadline"));
 });
 
+test("rejects missing stable folder_find error message codes", () => {
+  const result = validateFolderDiscoveryContract(
+    changed("folder", (markdown) =>
+      markdown
+        .replace("`search_query_too_broad`", "broad query")
+        .replace("`folder_discovery_unavailable`", "temporary failure"),
+    ),
+  );
+  assert(result.includes("folder-management: folder_find 400 must identify search_query_too_broad"));
+  assert(result.includes("folder-management: folder_find 503 must identify folder_discovery_unavailable"));
+});
+
+test("rejects fallback after runtime failures or through a post-1020-only match mode", () => {
+  const result = validateFolderDiscoveryContract(
+    changed("folder", (markdown) =>
+      markdown
+        .replace(
+          "only when the client tool registry does not contain `folder_find`, or an HTTP\n   request to `GET /v1/search/folders` returns 404 or 405",
+          "whenever folder discovery fails",
+        )
+        .replace(
+          "Do not fall back after a 400, 401, 403,\n   422, 500, or 503 response, a timeout, or a network failure",
+          "Fall back after any error",
+        )
+        .replace(
+          "type=folder&searchIn=name&limit=50",
+          "type=folder&searchIn=name&matchMode=all&limit=50",
+        ),
+    ),
+  );
+  assert(result.includes("folder-management: compatibility fallback must require confirmed endpoint absence"));
+  assert(result.includes("folder-management: compatibility fallback must not mask API or transport failures"));
+  assert(result.includes("folder-management: compatibility searches must not require matchMode"));
+});
+
+test("rejects onboarding guidance that falls back without confirmed absence", () => {
+  const result = validateFolderDiscoveryContract(
+    changed("gettingStarted", (markdown) =>
+      markdown
+        .replace(
+          "Only when the tool registry lacks `folder_find`, or the endpoint returns 404 or\n405",
+          "Whenever folder discovery fails",
+        )
+        .replace(
+          "Do not fall back after another response or transport failure.",
+          "Fall back after any error.",
+        ),
+    ),
+  );
+  assert(result.includes("getting-started: compatibility fallback must be absence-only"));
+});
+
+test("rejects legacy file evidence that can introduce an unproven folder", () => {
+  const result = validateFolderDiscoveryContract(
+    changed("folder", (markdown) =>
+      markdown
+        .replace(
+          "Count a file group only when its `sessionId` is in\n   that direct-folder ID set.",
+          "Promote every file group as a folder candidate.",
+        )
+        .replace(
+          "If direct search\n   returned no folder candidates, stop",
+          "If direct search returned no folder candidates, use file evidence",
+        ),
+    ),
+  );
+  assert(result.includes("folder-management: legacy file evidence must only support proven direct folder IDs"));
+  assert(result.includes("folder-management: file evidence must not create candidates after an empty direct search"));
+});
+
 test("rejects the wrong PLOCAN compatibility-fallback leaf", () => {
   const result = validateFolderDiscoveryContract(
     changed("folder", (markdown) =>
       markdown
-        .replace("search for `Phase`", "search for `Works`")
-        .replace("do not\n   treat `Works` as the leaf", "treat `Works` as the leaf"),
+        .replace("search for\n   `Phase`", "search for\n   `Works`")
+        .replace("do not treat `Works` as the leaf", "treat `Works` as the leaf"),
     ),
   );
-  assert(result.includes("folder-management: PLOCAN fallback must target Phase 0 and Phase A beneath PLOCAN / Works"));
+  assert(result.includes("folder-management: PLOCAN fallback must preserve unverified hierarchy qualifiers"));
 });
 
 test("rejects split children arrays and legacy fallback guidance", () => {
@@ -461,7 +531,7 @@ test("rejects guidance that sends the whole request as the folder query", () => 
   const result = validateFolderDiscoveryContract(
     changed("folder", (markdown) =>
       markdown.replace(
-        "separate the likely leaf-folder stem and requested leaf labels from hierarchy\n   qualifiers.",
+        "separate the likely leaf-folder stem and requested\n   leaf labels from hierarchy qualifiers.",
         "Use the complete user request as the search query.",
       ),
     ),

@@ -7,11 +7,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
+const DEFAULT_SOURCE_ROOT = path.resolve(path.dirname(SCRIPT_PATH), "..");
 
 export const TARGET_SKILLS = Object.freeze([
+  "authentication",
+  "file-comment",
   "file-management",
   "folder-management",
   "getting-started",
+  "project-invitation",
   "project-management",
 ]);
 
@@ -176,20 +180,33 @@ function uniqueLocations(locations) {
   });
 }
 
-async function candidateLocations({ cwd, home, codexHome }) {
-  const locations = [];
-  const repositoryRoot = await findRepositoryRoot(cwd);
-  if (repositoryRoot) {
-    locations.push({ root: repositoryRoot, kind: "repository" });
+function ancestorsThrough(start, boundary) {
+  const resolvedBoundary = path.resolve(boundary);
+  const result = [];
+  for (const directory of ancestors(start)) {
+    result.push(directory);
+    if (directory === resolvedBoundary) break;
   }
+  return result;
+}
 
-  for (const directory of ancestors(cwd)) {
+async function candidateLocations({ target, sourceRoot, home, codexHome, hermesHome }) {
+  const locations = [{ root: sourceRoot, kind: "source-reference" }];
+  const repositoryRoot = await findRepositoryRoot(target);
+  const projectBoundary = repositoryRoot ?? path.resolve(target);
+
+  for (const directory of ancestorsThrough(target, projectBoundary)) {
     locations.push({ root: path.join(directory, ".agents", "skills"), kind: "project-agents" });
     locations.push({ root: path.join(directory, ".codex", "skills"), kind: "project-codex" });
+    locations.push({ root: path.join(directory, ".claude", "skills"), kind: "project-claude" });
+    locations.push({ root: path.join(directory, "skills"), kind: "project-workspace" });
   }
 
   locations.push({ root: path.join(home, ".agents", "skills"), kind: "user-agents" });
   locations.push({ root: path.join(codexHome, "skills"), kind: "user-codex" });
+  locations.push({ root: path.join(home, ".claude", "skills"), kind: "user-claude" });
+  locations.push({ root: path.join(home, ".openclaw", "skills"), kind: "user-openclaw" });
+  locations.push({ root: path.join(hermesHome, "skills"), kind: "user-hermes" });
 
   const cacheRoot = path.join(codexHome, "plugins", "cache");
   for (const root of await findPluginSkillRoots(cacheRoot)) {
@@ -242,12 +259,24 @@ async function inspectCopy(skill, location, order) {
   };
 }
 
-export async function discoverSkillCopies({
-  cwd = process.cwd(),
-  home = os.homedir(),
-  codexHome = process.env.CODEX_HOME || path.join(home, ".codex"),
-} = {}) {
-  const locations = await candidateLocations({ cwd, home, codexHome });
+export async function discoverSkillCopies(options = {}) {
+  const home = path.resolve(options.home ?? os.homedir());
+  const target = path.resolve(options.target ?? options.cwd ?? process.cwd());
+  const sourceRoot = path.resolve(options.sourceRoot ?? DEFAULT_SOURCE_ROOT);
+  const codexHome = path.resolve(
+    options.codexHome ?? process.env.CODEX_HOME ?? path.join(home, ".codex"),
+  );
+  const defaultHermesHome = process.platform === "win32" && process.env.LOCALAPPDATA
+    ? path.join(process.env.LOCALAPPDATA, "hermes")
+    : path.join(home, ".hermes");
+  const hermesHome = path.resolve(options.hermesHome ?? defaultHermesHome);
+  const locations = await candidateLocations({
+    target,
+    sourceRoot,
+    home,
+    codexHome,
+    hermesHome,
+  });
   const copies = [];
 
   for (const skill of TARGET_SKILLS) {
@@ -267,27 +296,36 @@ export async function discoverSkillCopies({
     left.path.localeCompare(right.path),
   );
 
-  const duplicates = TARGET_SKILLS.map((skill) => {
-    const matches = copies.filter(
-      (copy) => copy.skill === skill && copy.location !== "repository",
-    );
-    return {
-      skill,
-      installedCopies: matches.length,
-      distinctHashes: new Set(matches.map((copy) => copy.sha256)).size,
-      paths: matches.map((copy) => copy.path),
-    };
-  }).filter((entry) => entry.installedCopies > 1);
+  const installedOrCached = copies.filter(
+    (copy) => copy.location !== "source-reference",
+  );
+  const duplicates = [...new Set(installedOrCached.map((copy) => copy.exposedName))]
+    .sort()
+    .map((exposedName) => {
+      const matches = installedOrCached.filter(
+        (copy) => copy.exposedName === exposedName,
+      );
+      return {
+        skill: matches[0]?.skill ?? exposedName,
+        exposedName,
+        installedCopies: matches.length,
+        distinctHashes: new Set(matches.map((copy) => copy.sha256)).size,
+        paths: matches.map((copy) => copy.path),
+      };
+    })
+    .filter((entry) => entry.installedCopies > 1);
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     readOnly: true,
     resolutionNote:
-      "catalogOrder is deterministic found-copy scan order only; repository entries are references and plugin-cache entries are candidates, while the active client owns runtime skill precedence, so duplicate unprefixed names are ambiguous",
+      "catalogOrder is deterministic found-copy scan order only; source-reference entries never count as installed collisions, duplicate groups use exposedName, plugin-cache entries are candidates, and the active client owns runtime skill precedence",
     roots: {
-      cwd: path.resolve(cwd),
-      home: path.resolve(home),
-      codexHome: path.resolve(codexHome),
+      target,
+      sourceRoot,
+      home,
+      codexHome,
+      hermesHome,
     },
     copies,
     duplicates,
@@ -307,11 +345,11 @@ function printHuman(report) {
 
   for (const skill of TARGET_SKILLS) {
     const copies = report.copies.filter((copy) => copy.skill === skill);
-    const installedOrCached = copies.filter((copy) => copy.location !== "repository");
+    const installedOrCached = copies.filter((copy) => copy.location !== "source-reference");
     const distinct = new Set(copies.map((copy) => copy.sha256)).size;
     console.log(
       `\n${skill}: ${installedOrCached.length} installed/cache candidate(s), ` +
-      `${copies.length - installedOrCached.length} repository reference(s), ` +
+      `${copies.length - installedOrCached.length} source reference(s), ` +
       `${distinct} distinct hash(es)`,
     );
     if (copies.length === 0) {
@@ -329,14 +367,35 @@ function printHuman(report) {
       console.log(`      path=${copy.path}`);
     }
   }
+
+  console.log("\nExposed-name collisions:");
+  if (report.duplicates.length === 0) {
+    console.log("  (none found)");
+  } else {
+    for (const duplicate of report.duplicates) {
+      console.log(
+        `  ${duplicate.exposedName}: ${duplicate.installedCopies} candidate(s), ` +
+        `${duplicate.distinctHashes} distinct hash(es)`,
+      );
+    }
+  }
 }
 
 export async function main(argv = process.argv.slice(2)) {
   const home = readOption(argv, "--home", os.homedir());
+  const legacyTarget = readOption(argv, "--cwd", process.cwd());
   const report = await discoverSkillCopies({
-    cwd: readOption(argv, "--cwd", process.cwd()),
+    target: readOption(argv, "--target", legacyTarget),
+    sourceRoot: readOption(argv, "--source-root", DEFAULT_SOURCE_ROOT),
     home,
     codexHome: readOption(argv, "--codex-home", process.env.CODEX_HOME || path.join(home, ".codex")),
+    hermesHome: readOption(
+      argv,
+      "--hermes-home",
+      process.platform === "win32" && process.env.LOCALAPPDATA
+        ? path.join(process.env.LOCALAPPDATA, "hermes")
+        : path.join(home, ".hermes"),
+    ),
   });
 
   if (argv.includes("--json")) {

@@ -202,12 +202,12 @@ silently traversing project trees.
 | Code | Description |
 | --- | --- |
 | 200 | Complete or explicitly partial canonical candidates returned |
-| 400 | Query has no safe high-signal term or exceeds the bounded search breadth threshold |
+| 400 | `search_query_too_broad`: query has no safe high-signal term or exceeds the bounded search breadth threshold |
 | 401 | Invalid or expired credential |
 | 403 | OAuth credential lacks the `read` scope |
 | 422 | Missing/blank query, invalid limit, or malformed narrowing ID |
 | 500 | Non-transient search or canonical-storage failure |
-| 503 | Shared request deadline expires, both evidence branches are unavailable, or canonical hydration fails |
+| 503 | `folder_discovery_unavailable`: shared request deadline expires, both evidence branches are unavailable, or canonical hydration fails |
 
 **Example:**
 
@@ -802,44 +802,60 @@ Do not list every project or walk child endpoints to discover a folder by name.
    `breadcrumb`. Preserve explicit partial status. Return or ask the user to
    choose among those candidates; do not perform client-side traversal.
 
-2. **Compatibility fallback only:** if an older deployment does not expose
-   `GET /v1/search/folders`, use the following fixed two-search sequence. First
-   separate the likely leaf-folder stem and requested leaf labels from hierarchy
-   qualifiers. In the example above, search for `Phase`, retain the requested
-   labels `0` and `A`, and use `PLOCAN` / `Works` as hierarchy qualifiers. Rank
-   canonical `Phase 0` and `Phase A` results beneath `PLOCAN / Works`; do not
-   treat `Works` as the leaf. Do not send request verbs or the entire
+2. **Compatibility fallback only:** use the following fixed legacy sequence
+   only when the client tool registry does not contain `folder_find`, or an HTTP
+   request to `GET /v1/search/folders` returns 404 or 405. Those conditions
+   confirm that the endpoint is absent. Do not fall back after a 400, 401, 403,
+   422, 500, or 503 response, a timeout, or a network failure; surface that
+   error instead.
+
+   A deployment old enough to lack `folder_find` also lacks `matchMode` and may
+   not return canonical `container`, `project`, or `breadcrumb` context from
+   generic search. First separate the likely leaf-folder stem and requested
+   leaf labels from hierarchy qualifiers. In the example above, search for
+   `Phase`, retain the requested labels `0` and `A`, and keep `PLOCAN` / `Works`
+   only as user-provided qualifiers. Do not claim that a result is beneath
+   `PLOCAN / Works` unless the response itself supplies canonical context, and
+   do not treat `Works` as the leaf. Do not send request verbs or the entire
    natural-language sentence as `{encodedQuery}`.
 
    Search folder name rows directly:
 
    ```text
-   GET /v1/search?q={encodedQuery}&type=folder&searchIn=name&matchMode=all&limit=50
+   GET /v1/search?q={encodedQuery}&type=folder&searchIn=name&limit=50
    ```
 
-   Read the grouped `{ data, count, cursor }` response. Rank an exact
-   case-insensitive `sessionName` match first, then normalized all-term name
+   Read the grouped `{ data, count, cursor }` response. Each direct folder
+   result proves that its `sourceId` is a folder ID. Rank an exact
+   case-insensitive `sessionName` match first, then normalized requested-label
    matches, then the API relevance order. A folder result's canonical Studio
-   URL is `https://studio.spuree.com/folders/{sourceId}`.
+   URL is `https://studio.spuree.com/folders/{sourceId}`. Treat a legacy
+   `projectId` as an opaque identifier; do not invent a project name or folder
+   path when canonical context is absent.
 
-   Only when the direct results are empty or still ambiguous and the request
-   contains useful file/content terms, make **one** evidence fallback request:
+   Only when the direct search returned at least two plausible folder
+   candidates, the result is still ambiguous, and the request contains useful
+   file/content terms, make **one** evidence fallback request. If direct search
+   returned no folder candidates, stop and ask for a narrower name or project;
+   file evidence cannot establish a folder identity by itself.
 
    ```text
-   GET /v1/search?q={encodedQuery}&type=file&searchIn=all&matchMode=all&limit=50
+   GET /v1/search?q={encodedQuery}&type=file&searchIn=all&limit=50
    ```
 
-   Use concise evidence terms, not request verbs. Group the returned file
-   results by their containing `sessionId`; use the number and relevance of
-   matching files only as supporting evidence. Promote a group only when its
-   result context identifies that `sessionId` as a folder, and skip
-   project-root files. Its canonical Studio URL is
-   `https://studio.spuree.com/folders/{sessionId}`.
+   Use concise evidence terms, not request verbs. Build a set of the direct
+   folder results' `sourceId` values, then group returned file results by their
+   containing `sessionId`. Count a file group only when its `sessionId` is in
+   that direct-folder ID set. File evidence may re-rank an already-proven direct
+   folder candidate, but it must never introduce a new folder candidate or
+   establish hierarchy. This intersection also excludes project-root files,
+   because a project ID was not returned as a direct folder `sourceId`.
 
-   Return the best candidates with their project context and evidence. If the
-   result is still ambiguous, ask the user to choose. Stop after the direct
-   search and the single fallback: do not enumerate projects, call child
-   endpoints, or recursively traverse folders for named-folder discovery.
+   Return the best candidates with only the context actually present and the
+   supporting evidence counts. If the result is still ambiguous, ask the user
+   to choose. Stop after the direct search and the single fallback: do not
+   enumerate projects, call child endpoints, or recursively traverse folders
+   for named-folder discovery.
 
 `GET /v1/folders` is for globally sorted listing such as “recent folders”; it
 is not the fallback for a name query.

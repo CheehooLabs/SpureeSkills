@@ -66,13 +66,21 @@ node --test test/*.test.mjs
 ```
 
 To diagnose duplicate public and plugin skill copies without changing or
-deleting any installation, run:
+deleting any installation, run the script from a checkout of this repository
+and point `--target` at the project or agent workspace whose active catalog you
+want to inspect:
 
 ```bash
-node scripts/diagnose-spuree-skill-copies.mjs
-node scripts/diagnose-spuree-skill-copies.mjs --json
+node scripts/diagnose-spuree-skill-copies.mjs --target /path/to/project
+node scripts/diagnose-spuree-skill-copies.mjs --target /path/to/project --json
 ```
 
-The diagnostic reports paths, SHA-256 hashes, catalog scan order, and plugin
-namespace/version metadata. Scan order is informational; the active client owns
-runtime precedence when duplicate unprefixed skill names exist.
+When the checkout and target project differ, the checkout remains the immutable
+source reference while `--target` controls project/workspace discovery. The
+diagnostic scans all seven public skills across `.agents`, `.codex`, `.claude`,
+OpenClaw workspace/global, Hermes global, and Codex plugin-cache roots. It
+reports paths, SHA-256 hashes, catalog scan order, exposed names, and plugin
+namespace/version metadata. Collision groups use the exposed skill name, so a
+namespaced plugin such as `internal-spuree-skills:folder-management` is not
+misreported as shadowing the public `folder-management` skill. Scan order is
+informational; the active client owns runtime precedence.
