@@ -38,29 +38,35 @@ Or: `X-API-Key: $SPUREE_API_KEY`. See the **authentication** skill.
 
 Full-text search across files, folders, projects, and assets. Backed by the `content_index` collection (Atlas `$search`), kept in sync via MongoDB Change Streams.
 
-> **⚠️ Breaking change (ENG-5362).** This endpoint replaced the legacy `sessions`/`files` regex search. Both the request params and the response shape changed:
-> - Matching is now Atlas **analyzer-based token matching**, not case-insensitive regex substring. `upload` no longer substring-matches `spuree_upload_test.txt`.
-> - `type` values changed: old `file` | `session` → new `file` | `folder` | `project` | `asset` (the old `session` split into `folder`/`project`, plus a new `asset` source type).
-> - Response is now **grouped** — one item per source object with a `matches[]` array — and paginated by an opaque `cursor` instead of a flat list with `limit`/offset.
+Search is Atlas analyzer-based rather than substring matching. It returns one
+grouped item per source object, with the matching indexed rows in `matches[]`,
+and uses an opaque cursor for pagination.
 
 **Query Parameters:**
 
-| Parameter | Type | Default | Description |
-| --- | --- | --- | --- |
-| `q` | string | — | Search query (**required**, 1–255 chars). Full-text token match. |
-| `type` | string | — | Filter by source type: `file` \| `folder` \| `project` \| `asset`. Omit for all. |
-| `searchIn` | string | `all` | Which rows to search: `name` \| `content` (body + annotation) \| `all`. |
-| `format` | string | — | Comma-separated file formats, e.g. `txt,md`. Applies to `file` type only. |
-| `entityType` | string | — | Comma-separated entity types, e.g. `character,prop`. Applies to `asset` type only. |
-| `workspaceId` | string | — | Restrict to a single workspace (ObjectId). Must be one the caller is a member of, else empty page; malformed id → 422. |
-| `projectId` | string | — | Restrict to a single project (ObjectId). Must be one the caller can access, else empty page; malformed id → 422. |
-| `createdAfter` | string | — | ISO 8601 lower bound on source `createdAt`. **Timezone required** (`Z` or `±HH:MM`) — naive datetimes → 422. |
-| `createdBefore` | string | — | ISO 8601 upper bound. Timezone required. |
-| `limit` | integer | 50 | Page size (1–200). |
-| `cursor` | string | — | Opaque pagination token from a previous response. Pass to fetch the next page. |
-| `includePreview` | boolean | `false` | When `true`, **`asset`** results add a short-lived signed `previewUrl` (~1h) and `previewFileFormat` for the cover image/video. Other source types are unaffected; the raw bucket/key pointer is never returned. |
+| Parameter | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `q` | string | Yes | — | Search query (1–255 chars). Full-text token match. |
+| `type` | string | No | — | Filter by source type: `file` \| `folder` \| `project` \| `asset`. Deprecated `workspace` remains accepted for compatibility and returns an empty page because workspace rows are not indexed. Omit for all. |
+| `searchIn` | string | No | `all` | Indexed rows to search: `name` \| `content` (body + annotation) \| `all`. |
+| `matchMode` | string | No | `any` | Term matching inside each indexed row: `any` \| `all` \| `phrase`. `any` matches at least one analyzed term, `all` requires every analyzed term, and `phrase` requires ordered adjacent terms. |
+| `format` | string | No | — | Comma-separated file formats, e.g. `txt,md`. Applies to `file` type only. |
+| `entityType` | string | No | — | Comma-separated entity types, e.g. `character,prop`. Applies to `asset` type only. |
+| `workspaceId` | string | No | — | Restrict to a single workspace (ObjectId). Must be one the caller is a member of, else empty page; malformed id → 422. |
+| `projectId` | string | No | — | Restrict to a single project (ObjectId). Must be one the caller can access, else empty page; malformed id → 422. |
+| `createdAfter` | string | No | — | ISO 8601 lower bound on source `createdAt`. **Timezone required** (`Z` or `±HH:MM`) — naive datetimes → 422. |
+| `createdBefore` | string | No | — | ISO 8601 upper bound. Timezone required. |
+| `limit` | integer | No | 50 | Page size (1–200). |
+| `cursor` | string | No | — | Opaque pagination token from a previous response. Replay the original `q` and every corpus-shaping filter. Newly issued cursors use HMAC-signed `v1` envelopes and bind that corpus. Unsigned pre-v1 cursors remain accepted as unbound `any`-mode compatibility tokens only until 2026-09-07 00:00 UTC and must never be reused with another corpus. |
+| `sortBy` | string | No | `relevance` | Result ordering: `relevance` \| `createdAt`. |
+| `sortOrder` | string | No | `desc` | Direction for `sortBy=createdAt`: `asc` \| `desc`. Ignored for relevance, which is always descending. |
+| `includePreview` | boolean | No | `false` | When `true`, **`asset`** results add a short-lived signed `previewUrl` (~1h) and `previewFileFormat` for the cover image/video. Other source types are unaffected; the raw bucket/key pointer is never returned. |
 
 **Response:** `{ "data": [...], "count": N, "cursor": "<opaque token or null>" }`
+
+Continue pagination whenever `cursor` is non-null, even when `count` is smaller
+than the requested `limit`; canonical validation can suppress stale hits and
+produce a short page that still has another page.
 
 Each `data` item is one matched source object. Common fields:
 
@@ -73,9 +79,40 @@ Each `data` item is one matched source object. Common fields:
 | `matches` | array | Per-row matches (see below) |
 | `workspaceId` | string? | Workspace ObjectId |
 | `projectId` | string? | Project ObjectId |
-| `sourceCreatedAt` | datetime | Source object's creation timestamp |
+| `sourceCreatedAt` | datetime \| null | Source object's creation timestamp when indexed. |
+| `container` | object \| null | Canonical object with `id`, `name`, and `kind`; `kind` is `folder` or `project`. File: immediate owner. Folder: immediate parent. |
+| `project` | object \| null | Canonical creative-project owner (`id`, `name`). |
+| `breadcrumb` | array \| null | Canonical project-root-to-container path (`id`, `name`, `sessionType`). |
 
-**File / folder / project** items additionally carry: `fileName`, `fileFormat` (file only), `sessionId` (parent project/folder), `entitySessionId` (owning entity, if any). **Folder / project** items also carry `sessionName` — the clean display name. Use it for display rather than deriving a name from `snippets`/row text, which mix the name with tags (folders) or description + tags (projects).
+Canonical context objects use these exact wire shapes:
+
+| Object | Exact shape |
+| --- | --- |
+| `container` | `{ id: string, name: string, kind: "folder" \| "project" }` |
+| `project` | `{ id: string, name: string }` |
+| `breadcrumb[]` | `{ id: string, name: string, sessionType: "creative_project" \| "session" }` |
+
+The `container`, `project`, and `breadcrumb` keys are required on every search
+item but nullable as one all-or-nothing context unit. Project and asset results
+use null context. File and folder results always carry a complete canonical
+context unit; hits whose current lineage is missing, deleted, malformed, stale,
+or unauthorized are omitted rather than returned with null or partial hierarchy
+metadata. For file and folder results, use these canonical names and IDs instead
+of deriving hierarchy from snippets or denormalized index fields.
+
+`container` has the exact shape `{ id, name, kind }`, where `kind` is `folder`
+or `project`. Only a `folder` container ID belongs in a
+`/folders/{containerId}` URL; a `project` container is the project root and
+belongs in `/projects/{containerId}`.
+
+**File / folder / project** items may additionally carry `fileName`,
+`fileFormat` (file only), `sessionId`, and `entitySessionId` (owning entity, if
+any). For a file, `sessionId` is its current canonical containing folder or
+project. For a folder or project result, `sessionId` identifies the matched
+session itself; determine parentage only from `container` and `breadcrumb`.
+**Folder / project** items also carry `sessionName` — the clean display name.
+Use it for display rather than deriving a name from `snippets`/row text, which
+mix the name with tags (folders) or description + tags (projects).
 
 **Asset** items instead carry asset-specific fields (no `fileName`/`fileFormat`):
 
@@ -99,25 +136,45 @@ Each entry in `matches[]`:
 | `lineStart` | integer? | Starting line number of the chunk (content rows) |
 
 ```bash
-# Find files named/containing "hero"
+# Find files with any analyzed term from "hero"
 curl "https://data.spuree.com/api/v1/search?q=hero&type=file" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 
-# Search only file names, restricted to one project, txt/md only
-curl "https://data.spuree.com/api/v1/search?q=quarterly%20report&type=file&searchIn=name&projectId=...&format=txt,md&limit=50" \
+# Search file names for an exact analyzed phrase, restricted to one project
+curl "https://data.spuree.com/api/v1/search?q=quarterly%20report&type=file&searchIn=name&matchMode=phrase&projectId=...&format=txt,md&limit=50" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 
-# Next page
-curl "https://data.spuree.com/api/v1/search?q=hero&cursor=<token>" \
+# Next page: replay the original query and corpus-shaping parameters
+curl "https://data.spuree.com/api/v1/search?q=hero&type=file&cursor=<token>" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 ```
 
-**Errors specific to search:**
+Newly issued HMAC-signed `v1` cursors also bind the caller's current permission
+scope. Treat a cursor as opaque; do not edit or reuse it with a different query,
+source type, filter set, or caller. A malformed, tampered, or mismatched bound
+cursor returns 422. If a previously valid cursor returns 422 after the caller's
+permission scope changes, discard it and restart from page one with the same
+query and filters; do not retry the rejected cursor.
 
-| Code | messageCode | Cause | Resolution |
-| --- | --- | --- | --- |
-| 400 | `search_query_too_broad` | Query would match more than ~100,000 rows. Body includes `lowerBound` and `threshold`. | Prompt the user to refine with more specific terms. |
-| 422 | — | Missing/invalid `q`, naive (timezone-less) `createdAfter`/`createdBefore`, or malformed `workspaceId`/`projectId`. | Fix the parameter. |
+Unsigned pre-v1 cursors are treated as unbound `any`-mode compatibility tokens,
+regardless of a re-sent `matchMode`, only until **2026-09-07 00:00 UTC**. During
+that bounded migration window, a fully stripped and re-encoded modern payload
+is statelessly indistinguishable from a genuine v0 token, so keep any unsigned
+cursor only within its original pagination sequence. At and after the sunset,
+every unsigned cursor is rejected; only a valid signed `v1` envelope is
+accepted.
+
+**Status Codes:**
+
+| Code | Description |
+| --- | --- |
+| 200 | One canonical search page returned. |
+| 400 | `search_query_too_broad`: query would match at least the bounded threshold; refine the terms. |
+| 401 | Invalid or expired credential. |
+| 403 | OAuth credential lacks the `read` scope. |
+| 422 | Missing/invalid parameter, timezone-less date, malformed narrowing ID, malformed/tampered/mismatched cursor, or an unsigned cursor at/after the migration sunset. |
+| 500 | Non-transient search or canonical-storage failure. |
+| 503 | `search_context_unavailable`: canonical validation could not safely advance a stale-only page. |
 
 ---
 
@@ -433,19 +490,19 @@ When a user wants to **view**, **preview**, or **see** a file:
 
 1. If the agent has browser tools (e.g., Chrome DevTools MCP), **open the Studio preview URL directly**:
    ```
-   navigate_page → https://studio.spuree.com/file/{fileId}
+   navigate_page → https://studio.spuree.com/files/{fileId}
    ```
 
 2. Otherwise, **return the Studio preview URL** for the user to click:
    ```
-   https://studio.spuree.com/file/{fileId}
+   https://studio.spuree.com/files/{fileId}
    ```
 
 Do **not** download the file or attempt to open it locally. The Studio URL is permanent, permission-aware, and renders images, video, 3D, and other supported formats inline in the browser.
 
 | Use case | URL | Properties |
 | --- | --- | --- |
-| **Share with user / preview** | `https://studio.spuree.com/file/{fileId}` | Permanent, permission-aware, renders preview UI |
+| **Share with user / preview** | `https://studio.spuree.com/files/{fileId}` | Permanent, permission-aware, renders preview UI |
 | **Programmatic download** | `downloadUrl` from `GET /v1/files/{fileId}` | Short-lived presigned S3 URL — do not share, bypasses permissions and expires |
 
 **Rule of thumb:** after `POST /v1/files` (upload) build the Studio URL from the returned `fileId`; after `GET /v1/search` use the result's `sourceId` (the file id, for `sourceType: "file"` items). Return that URL to the user. Only fetch `downloadUrl` when the agent itself needs the bytes.
@@ -467,9 +524,8 @@ S3 key: `works_{workspaceId}/sess_{sessionId}/file_{fileId}`
 | Resource | URL Pattern |
 | --- | --- |
 | Project | `https://studio.spuree.com/projects/{projectId}` |
-| Folder (top-level) | `https://studio.spuree.com/projects/{projectId}/folders/{folderId}` |
-| Folder (nested) | `.../folders/{parentId}/{childId}` (up to 5 levels) |
-| File | `https://studio.spuree.com/file/{fileId}` |
+| Folder | `https://studio.spuree.com/folders/{folderId}` |
+| File | `https://studio.spuree.com/files/{fileId}` |
 
 ## Error Handling
 

@@ -199,7 +199,8 @@ List a project's immediate contents — folders, asset entities, and files — a
 | `entity` | Asset | `entityType` (character, motion, prop, etc.), `entityPreview` (preview image) |
 | `file` | File | `name` (mirrors the file's `fileName`), `fileFormat`, `fileSize`, `key`, `presignedUrl` (download URL) |
 
-> **Parsing note:** Read the `items` array. **Do not** look for separate top-level `sessions`, `entities`, or `files` arrays — older deployments returned that shape, but the current API returns the unified `items` list, so a parser expecting the old shape sees an empty result and wrongly concludes the project is empty. For backward compatibility, a robust parser can read `items` first and fall back to the legacy `sessions`/`entities`/`files` arrays only when `items` is absent.
+> **Parsing note:** Read the required top-level `items` array. Do not parse this
+> endpoint as separate collections; an empty project is exactly `{ "items": [] }`.
 
 ```bash
 curl "https://data.spuree.com/api/v1/projects/{projectId}/children" \
@@ -277,24 +278,35 @@ curl -X POST "https://data.spuree.com/api/v1/projects/{projectId}/leave" \
 
 ### Browse a Project
 
-1. `GET /v1/projects` → find the target project
-2. `GET /v1/projects/{id}/children` → see contents
-3. `GET /v1/sessions/{folderId}/children` → navigate deeper (folder-management skill)
+1. Start with a project ID the user supplied or selected.
+2. `GET /v1/projects/{id}/children` → inspect its immediate contents.
+3. `GET /v1/sessions/{folderId}/children` → inspect a selected folder
+   (folder-management skill).
 
 ### Agent Workflow: Project Discovery
 
-1. **List projects** → find the target
-2. **Get children** → browse recursively
-3. Use IDs with: **folder-management**, **file-management**
+For a named project, search its name directly:
+
+```text
+GET /v1/search?q={encodedQuery}&type=project&searchIn=name&limit=50
+```
+
+Read the grouped `{ data, count, cursor }` response and use each project
+result's `sourceId`. This compatibility-safe recipe intentionally omits
+`matchMode`, because generic search may target a deployment that predates that
+parameter. Rank an exact case-insensitive `sessionName` match first, then a
+normalized full-name match, then API relevance; ask the user to choose if the
+result remains ambiguous. Do not enumerate every project's children to
+discover a project or folder. For a named folder, use the bounded recipe in
+**folder-management**.
 
 ### Studio URLs
 
 | Resource | URL Pattern |
 | --- | --- |
 | Project | `https://studio.spuree.com/projects/{projectId}` |
-| Folder (top-level) | `https://studio.spuree.com/projects/{projectId}/folders/{folderId}` |
-| Folder (nested) | `.../folders/{parentId}/{childId}` (up to 5 levels) |
-| File | `https://studio.spuree.com/file/{fileId}` |
+| Folder | `https://studio.spuree.com/folders/{folderId}` |
+| File | `https://studio.spuree.com/files/{fileId}` |
 
 ## Error Handling
 

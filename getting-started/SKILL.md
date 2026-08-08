@@ -26,8 +26,10 @@ First identify what the user asked for:
 Then adapt to the capabilities available in the current client:
 
 - **Full MCP or locally installed skills:** Use `project_list`, or delegate to
-  **project-management**, for the read-only first success. Other project, folder,
-  file, and invitation actions may also be available.
+  **project-management**, for a general read-only connection check. When the
+  user names something to find, use search first and delegate named-folder
+  discovery to the bounded recipe in **folder-management**. Other project,
+  folder, file, and invitation actions may also be available.
 - **Search/fetch web connector:** Some ChatGPT connections expose only `search`,
   `fetch`, and `getting_started`. Explain that this surface is read-only. Ask what
   the user wants to find, call `search`, and use `fetch` to read the selected
@@ -45,6 +47,9 @@ Phrase these as examples the user can ask for, not as API names.
 - “Find files or folders about the hero character.”
 - “Show me what is inside this project or folder.”
 - “Read this text, Markdown, JSON, CSV, or source file.”
+
+Named discovery is search-first. It does not require listing every project or
+walking an entire folder tree.
 
 **Organize**
 
@@ -71,7 +76,12 @@ internal creator capabilities such as motion or video generation.
 
 ### Phase 1 — Get a read-only first success
 
-Prefer listing projects:
+If the user already supplied a name or topic, prefer a read-only search. For a
+folder request, use the one-call `folder_find` recipe in **folder-management**.
+Only when the tool registry lacks `folder_find`, or the endpoint returns 404,
+405, or 501, use its fixed legacy generic-search fallback with `type=folder` and
+`searchIn=name`. Do not fall back after another response or transport failure.
+Otherwise, use a small project list as a generic connection check:
 
 1. Tell the user you will check their Spuree connection.
 2. Call `project_list`, or use **project-management** to list projects.
@@ -94,7 +104,12 @@ Translate failures into plain guidance:
 
 If projects can be listed, let the user choose one, then use `project_browse` or
 the **project-management** skill to show its immediate contents. Continue into a
-folder with `folder_browse` or **folder-management** only when the user asks.
+known folder with `folder_browse` or **folder-management** only when the user
+asks. If the user gives a folder name instead, prefer the one-call
+`folder_find` workflow documented by **folder-management**. Only an older
+deployment confirmed to lack that endpoint may use its fixed two-search
+compatibility fallback; never enumerate projects or recursively traverse
+children to discover the folder.
 
 On the search/fetch connector, let the user choose a search result and call
 `fetch` to read it.
