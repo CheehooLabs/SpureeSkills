@@ -283,12 +283,28 @@ test("rejects a next-page example that changes the search corpus", () => {
   assert(result.includes("file-management: next-page example must replay type=file"));
 });
 
+test("rejects missing short-page cursor continuation guidance", () => {
+  const result = validateFolderDiscoveryContract(
+    changed("file", (markdown) =>
+      markdown.replace(
+        "Continue pagination whenever `cursor` is non-null, even when `count` is smaller\nthan the requested `limit`",
+        "Stop when a page is shorter than the requested limit",
+      ),
+    ),
+  );
+  assert(result.includes("file-management: short-page cursor continuation semantics are missing"));
+});
+
 test("rejects missing cursor replay and mismatch guidance", () => {
   const result = validateFolderDiscoveryContract(
     changed("file", (markdown) =>
       markdown
         .replace("Replay the original `q` and every corpus-shaping filter", "Pass the cursor")
-        .replace("A malformed, tampered, or mismatched bound\ncursor returns 422.", "Retry on cursor errors."),
+        .replace("A malformed, tampered, or mismatched bound\ncursor returns 422.", "Retry on cursor errors.")
+        .replace(
+          "permission scope changes, discard it and restart from page one with the same\nquery and filters; do not retry the rejected cursor",
+          "permission scope changes, retry the same cursor",
+        ),
     ),
   );
   assert(result.includes("file-management: cursor replay and mismatch semantics are missing"));

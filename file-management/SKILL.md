@@ -64,6 +64,10 @@ and uses an opaque cursor for pagination.
 
 **Response:** `{ "data": [...], "count": N, "cursor": "<opaque token or null>" }`
 
+Continue pagination whenever `cursor` is non-null, even when `count` is smaller
+than the requested `limit`; canonical validation can suppress stale hits and
+produce a short page that still has another page.
+
 Each `data` item is one matched source object. Common fields:
 
 | Field | Type | Description |
@@ -148,7 +152,9 @@ curl "https://data.spuree.com/api/v1/search?q=hero&type=file&cursor=<token>" \
 Newly issued HMAC-signed `v1` cursors also bind the caller's current permission
 scope. Treat a cursor as opaque; do not edit or reuse it with a different query,
 source type, filter set, or caller. A malformed, tampered, or mismatched bound
-cursor returns 422.
+cursor returns 422. If a previously valid cursor returns 422 after the caller's
+permission scope changes, discard it and restart from page one with the same
+query and filters; do not retry the rejected cursor.
 
 Unsigned pre-v1 cursors are treated as unbound `any`-mode compatibility tokens,
 regardless of a re-sent `matchMode`, only until **2026-09-07 00:00 UTC**. During

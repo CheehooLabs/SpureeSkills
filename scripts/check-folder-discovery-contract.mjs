@@ -583,6 +583,13 @@ function validateSearchContract(markdown, errors) {
     section.includes('{ "data": [...], "count": N, "cursor": "<opaque token or null>" }'),
     "file-management: search response must be grouped as {data,count,cursor}",
   );
+  addError(
+    errors,
+    /Continue pagination whenever `cursor` is non-null, even when `count` is smaller\s+than the requested `limit`/.test(
+      section,
+    ),
+    "file-management: short-page cursor continuation semantics are missing",
+  );
   const fieldTable = findFieldTable(section, "sourceType");
   validateExactFieldContract(fieldTable, SEARCH_ITEM_FIELDS, "file-management: grouped search item", errors);
   for (const field of ["container", "project", "breadcrumb"]) {
@@ -661,7 +668,10 @@ function validateSearchContract(markdown, errors) {
   addError(
     errors,
     /Replay the original `q` and every corpus-shaping filter/.test(section) &&
-      /malformed, tampered, or mismatched bound\s+cursor returns 422/.test(section),
+      /malformed, tampered, or mismatched bound\s+cursor returns 422/.test(section) &&
+      /permission scope changes, discard it and restart from page one with the same\s+query and filters; do not retry the rejected cursor/.test(
+        section,
+      ),
     "file-management: cursor replay and mismatch semantics are missing",
   );
   addError(
