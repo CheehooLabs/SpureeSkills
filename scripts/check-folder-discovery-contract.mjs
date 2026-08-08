@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const DEFAULT_ROOT = path.resolve(path.dirname(SCRIPT_PATH), "..");
 
+export const LEGACY_CURSOR_SUNSET_ISO = "2026-09-07T00:00:00.000Z";
+
 export const SKILL_FILES = Object.freeze({
   authentication: "authentication/SKILL.md",
   file: "file-management/SKILL.md",
@@ -975,7 +977,7 @@ function validateCanonicalUrls(documents, errors) {
   addError(errors, documents.file.includes("https://studio.spuree.com/files/{fileId}"), "file-management: canonical file URL is missing");
 }
 
-export function validateFolderDiscoveryContract(documents) {
+export function validateFolderDiscoveryContract(documents, { now = new Date() } = {}) {
   const errors = [];
   for (const key of Object.keys(SKILL_FILES)) {
     addError(errors, typeof documents[key] === "string", `missing skill document: ${key}`);
@@ -988,6 +990,11 @@ export function validateFolderDiscoveryContract(documents) {
   if (errors.length > 0) return errors.sort();
 
   validateSearchContract(documents.file, errors);
+  if (new Date(now).getTime() >= Date.parse(LEGACY_CURSOR_SUNSET_ISO)) {
+    errors.push(
+      `file-management: legacy cursor migration copy expired at ${LEGACY_CURSOR_SUNSET_ISO}; remove the unsigned-cursor compatibility guidance and update this guard`,
+    );
+  }
   validateFolderFindContract(documents.folder, errors);
   validateFolderListContract(documents.folder, errors);
   validateChildrenContract(documents.folder, "GET /v1/sessions/{sessionId}/children", "folder-management", errors);

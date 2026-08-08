@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  LEGACY_CURSOR_SUNSET_ISO,
   loadSkillDocuments,
   validateFolderDiscoveryContract,
 } from "../scripts/check-folder-discovery-contract.mjs";
@@ -315,6 +316,17 @@ test("rejects an unbounded legacy-cursor migration", () => {
     ),
   );
   assert(result.includes("file-management: bounded legacy cursor migration must be explicit"));
+});
+
+test("turns the legacy-cursor sunset into an explicit maintenance failure", () => {
+  const result = validateFolderDiscoveryContract(documents, {
+    now: LEGACY_CURSOR_SUNSET_ISO,
+  });
+  assert(
+    result.includes(
+      `file-management: legacy cursor migration copy expired at ${LEGACY_CURSOR_SUNSET_ISO}; remove the unsigned-cursor compatibility guidance and update this guard`,
+    ),
+  );
 });
 
 test("rejects incomplete generic search status documentation", () => {
