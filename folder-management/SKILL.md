@@ -850,6 +850,11 @@ Do not list every project or walk child endpoints to discover a folder by name.
    folder candidate, but it must never introduce a new folder candidate or
    establish hierarchy. This intersection also excludes project-root files,
    because a project ID was not returned as a direct folder `sourceId`.
+   Nested descendant files are a known blind spot of this legacy evidence
+   step: without canonical lineage, they cannot safely count toward an ancestor
+   folder candidate. Treat zero direct-file evidence as inconclusive, not as
+   proof that a folder is empty or irrelevant, and do not traverse descendants
+   to compensate.
 
    Return the best candidates with only the context actually present and the
    supporting evidence counts. If the result is still ambiguous, ask the user

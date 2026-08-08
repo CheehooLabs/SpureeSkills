@@ -900,6 +900,13 @@ function validateBoundedRecipe(folderMarkdown, errors) {
   );
   addError(
     errors,
+    /Nested descendant files are a known blind spot/.test(section) &&
+      /Treat zero direct-file evidence as inconclusive/.test(section) &&
+      /do not traverse descendants\s+to compensate/.test(section),
+    "folder-management: nested-file evidence limitation must be explicit",
+  );
+  addError(
+    errors,
     /If direct search\s+returned no folder candidates, stop/.test(section) &&
       /file evidence cannot establish a folder identity by itself/.test(section),
     "folder-management: file evidence must not create candidates after an empty direct search",
@@ -919,6 +926,33 @@ function validateBoundedRecipe(folderMarkdown, errors) {
   addError(errors, /do not\s+enumerate projects/i.test(section), "folder-management: recipe must prohibit project enumeration");
   addError(errors, /recursively traverse folders/i.test(section), "folder-management: recipe must prohibit recursive traversal");
   addError(errors, !/GET \/v1\/(projects|sessions)\/[^\n]*\/children/.test(section), "folder-management: recipe must not call child endpoints");
+}
+
+function validateProjectDiscoveryRecipe(projectMarkdown, errors) {
+  const section = getSection(projectMarkdown, "Agent Workflow: Project Discovery");
+  addError(errors, section !== null, "project-management: missing named-project discovery recipe");
+  if (!section) return;
+
+  const request = "GET /v1/search?q={encodedQuery}&type=project&searchIn=name&limit=50";
+  addError(errors, count(section, request) === 1, "project-management: named project discovery must be search-first");
+  addError(
+    errors,
+    !section.includes("matchMode="),
+    "project-management: compatibility-safe discovery must not require matchMode",
+  );
+  addError(
+    errors,
+    /compatibility-safe recipe intentionally omits\s+`matchMode`/.test(section) &&
+      /deployment that predates that\s+parameter/.test(section),
+    "project-management: matchMode compatibility reason must be explicit",
+  );
+  addError(
+    errors,
+    /exact case-insensitive `sessionName` match first/.test(section) &&
+      /normalized full-name match/.test(section) &&
+      /ask the user to choose if the\s+result remains ambiguous/.test(section),
+    "project-management: compatibility results need deterministic disambiguation",
+  );
 }
 
 function validateCanonicalUrls(documents, errors) {
@@ -959,13 +993,8 @@ export function validateFolderDiscoveryContract(documents) {
   validateChildrenContract(documents.folder, "GET /v1/sessions/{sessionId}/children", "folder-management", errors);
   validateChildrenContract(documents.project, "GET /v1/projects/{projectId}/children", "project-management", errors);
   validateBoundedRecipe(documents.folder, errors);
+  validateProjectDiscoveryRecipe(documents.project, errors);
   validateCanonicalUrls(documents, errors);
-
-  addError(
-    errors,
-    documents.project.includes("type=project&searchIn=name&matchMode=all"),
-    "project-management: named project discovery must be search-first",
-  );
   addError(
     errors,
     /prefer the one-call\s+`folder_find` workflow/.test(documents.gettingStarted),

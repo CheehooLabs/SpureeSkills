@@ -288,12 +288,16 @@ curl -X POST "https://data.spuree.com/api/v1/projects/{projectId}/leave" \
 For a named project, search its name directly:
 
 ```text
-GET /v1/search?q={encodedQuery}&type=project&searchIn=name&matchMode=all&limit=50
+GET /v1/search?q={encodedQuery}&type=project&searchIn=name&limit=50
 ```
 
 Read the grouped `{ data, count, cursor }` response and use each project
-result's `sourceId`. Do not enumerate every project's children to discover a
-project or folder. For a named folder, use the bounded recipe in
+result's `sourceId`. This compatibility-safe recipe intentionally omits
+`matchMode`, because generic search may target a deployment that predates that
+parameter. Rank an exact case-insensitive `sessionName` match first, then a
+normalized full-name match, then API relevance; ask the user to choose if the
+result remains ambiguous. Do not enumerate every project's children to
+discover a project or folder. For a named folder, use the bounded recipe in
 **folder-management**.
 
 ### Studio URLs

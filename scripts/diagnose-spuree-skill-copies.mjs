@@ -110,6 +110,18 @@ async function readPluginManifest(skillPath, cacheRoot) {
   return null;
 }
 
+function fallbackPluginNamespace(skillPath, cacheRoot) {
+  const skillsRoot = path.dirname(path.dirname(skillPath));
+  const relativeRoot = path.relative(path.resolve(cacheRoot), skillsRoot)
+    .split(path.sep)
+    .join("/");
+  const identity = createHash("sha256")
+    .update(relativeRoot)
+    .digest("hex")
+    .slice(0, 12);
+  return `unknown-plugin-${identity}`;
+}
+
 async function findPluginSkillRoots(cacheRoot, maxDepth = 8) {
   if (!(await isDirectory(cacheRoot))) return [];
 
@@ -238,7 +250,9 @@ async function inspectCopy(skill, location, order) {
   const plugin = location.kind === "plugin-cache"
     ? await readPluginManifest(skillPath, location.cacheRoot)
     : null;
-  const namespace = plugin?.name ?? null;
+  const namespace = location.kind === "plugin-cache"
+    ? plugin?.name ?? fallbackPluginNamespace(skillPath, location.cacheRoot)
+    : null;
 
   return {
     skill,

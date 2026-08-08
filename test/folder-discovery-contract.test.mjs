@@ -480,6 +480,31 @@ test("rejects legacy file evidence that can introduce an unproven folder", () =>
   assert(result.includes("folder-management: file evidence must not create candidates after an empty direct search"));
 });
 
+test("rejects hiding the nested-file limitation of legacy evidence", () => {
+  const result = validateFolderDiscoveryContract(
+    changed("folder", (markdown) =>
+      markdown
+        .replace("Nested descendant files are a known blind spot", "Nested files count normally")
+        .replace("Treat zero direct-file evidence as inconclusive", "Treat zero evidence as a negative")
+        .replace("do not traverse descendants\n   to compensate", "traverse descendants\n   to compensate"),
+    ),
+  );
+  assert(result.includes("folder-management: nested-file evidence limitation must be explicit"));
+});
+
+test("rejects requiring matchMode for named-project discovery", () => {
+  const result = validateFolderDiscoveryContract(
+    changed("project", (markdown) =>
+      markdown.replace(
+        "type=project&searchIn=name&limit=50",
+        "type=project&searchIn=name&matchMode=all&limit=50",
+      ),
+    ),
+  );
+  assert(result.includes("project-management: named project discovery must be search-first"));
+  assert(result.includes("project-management: compatibility-safe discovery must not require matchMode"));
+});
+
 test("rejects the wrong PLOCAN compatibility-fallback leaf", () => {
   const result = validateFolderDiscoveryContract(
     changed("folder", (markdown) =>

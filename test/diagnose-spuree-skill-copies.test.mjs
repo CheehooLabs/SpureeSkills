@@ -105,6 +105,60 @@ test("reports distinct direct and plugin copies without modifying them", async (
   }
 });
 
+test("keeps plugin copies with missing or corrupt manifests out of bare-name collisions", async (context) => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "spuree-copy-invalid-plugin-"));
+  context.after(() => rm(temporaryRoot, { force: true, recursive: true }));
+
+  const repository = path.join(temporaryRoot, "repository");
+  const home = path.join(temporaryRoot, "home");
+  const codexHome = path.join(temporaryRoot, "codex");
+  const cacheRoot = path.join(codexHome, "plugins", "cache");
+  await mkdir(path.join(repository, ".git"), { recursive: true });
+  await writeSkill(repository, "folder-management", "source\n");
+  await writeSkill(path.join(home, ".agents", "skills"), "folder-management", "direct\n");
+
+  const missingRoot = path.join(cacheRoot, "local", "missing-plugin", "1.0.0");
+  const missingPath = await writeSkill(
+    path.join(missingRoot, "skills"),
+    "folder-management",
+    "missing manifest\n",
+  );
+
+  const corruptRoot = path.join(cacheRoot, "local", "corrupt-plugin", "1.0.0");
+  const corruptManifestPath = path.join(corruptRoot, ".codex-plugin", "plugin.json");
+  await mkdir(path.dirname(corruptManifestPath), { recursive: true });
+  await writeFile(corruptManifestPath, "{not-json");
+  const corruptPath = await writeSkill(
+    path.join(corruptRoot, "skills"),
+    "folder-management",
+    "corrupt manifest\n",
+  );
+
+  const report = await discoverSkillCopies({
+    target: repository,
+    sourceRoot: repository,
+    home,
+    codexHome,
+  });
+  const pluginCopies = report.copies.filter(
+    (copy) => copy.skill === "folder-management" && copy.location === "plugin-cache",
+  );
+
+  assert.equal(pluginCopies.length, 2);
+  assert.equal(new Set(pluginCopies.map((copy) => copy.namespace)).size, 2);
+  for (const copy of pluginCopies) {
+    assert.match(copy.namespace, /^unknown-plugin-[0-9a-f]{12}$/);
+    assert.notEqual(copy.exposedName, "folder-management");
+  }
+  assert.equal(pluginCopies.find((copy) => copy.path === missingPath)?.plugin, null);
+  assert.deepEqual(pluginCopies.find((copy) => copy.path === corruptPath)?.plugin, {
+    name: null,
+    version: null,
+    manifestPath: corruptManifestPath,
+  });
+  assert.deepEqual(report.duplicates, []);
+});
+
 test("reports a direct skill installed through a directory symlink without changing it", async (context) => {
   const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "spuree-copy-symlink-"));
   context.after(() => rm(temporaryRoot, { force: true, recursive: true }));

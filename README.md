@@ -82,5 +82,8 @@ OpenClaw workspace/global, Hermes global, and Codex plugin-cache roots. It
 reports paths, SHA-256 hashes, catalog scan order, exposed names, and plugin
 namespace/version metadata. Collision groups use the exposed skill name, so a
 namespaced plugin such as `internal-spuree-skills:folder-management` is not
-misreported as shadowing the public `folder-management` skill. Scan order is
-informational; the active client owns runtime precedence.
+misreported as shadowing the public `folder-management` skill. If a cached
+plugin manifest is missing or unreadable, the diagnostic assigns that cache
+root a stable `unknown-plugin-<hash>` namespace instead of assuming the skill
+is bare. Scan order is informational; the active client owns runtime
+precedence.
