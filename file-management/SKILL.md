@@ -180,6 +180,7 @@ The caller **must** then upload to S3 **and** call `POST /v1/files/{fileId}/uplo
 | `fileSize` | integer | Yes | File size in bytes (accepts string for backward compat) |
 | `sessionId` | string | Yes | Target project or folder ObjectId |
 | `checksum` | string | No | CRC32 base64 (8 chars) for end-to-end verification. When provided, the presigned URL is signed with the checksum and S3 verifies the upload matches. |
+| `uploadHeaderProfile` | string | No | Signing profile for the presigned URL: `aws-sdk` (default; for AWS SDK clients, additionally signs `x-amz-sdk-checksum-algorithm`) or `direct` (for hand-rolled HTTP clients). The response echoes the profile and the exact `requiredHeaders` to send. |
 
 **Response (single mode):** `{ messageCode, fileId, mode: "single", uploadUrl, checksumBase64, contentType }`
 
@@ -279,20 +280,33 @@ After receiving the response, upload to S3 then call `POST /v1/files/{fileId}/up
 | 200 | Lock acquired, presigned URL(s) returned |
 | 409 | Checksum mismatch or locked by another user — disambiguate by the body's `code` (see **409 conflict codes** below) |
 
-**409 conflict codes.** Conflict bodies carry a machine-readable `code`, so an
-agent never has to guess which situation it is in:
+**409 conflict codes.** Upload-conflict bodies carry a machine-readable `code`
+on the endpoints listed below, so an agent can branch without guessing:
 
-- `UPLOAD_LOCK_CONFLICT` — another user holds the upload lock. `retryable: true`;
-  when `retryAfterSeconds` is present it is the seconds until the lock expires —
-  wait that long, then retry. The holder's identity and acquisition time are
-  **not disclosed by default** (privacy across workspaces); do not depend on
-  `holder`/`acquiredAt` being present.
-- `CHECKSUM_CONFLICT` — your `expectedChecksum` no longer matches the file
-  (someone else updated it). `retryable: false` as-is: re-fetch the file
-  (`GET /v1/files/{fileId}`), recompute the checksum, then retry the PUT.
+- `UPLOAD_LOCK_CONFLICT` — another user holds the upload lock; `retryable: true`.
+  When `retryAfterSeconds` is present, that is the seconds until the lock
+  expires. **Cap your patience**: wait it out only when it is short (≲ 2
+  minutes); otherwise — or after a second conflict — stop and surface the lock
+  to the user. Never sleep toward the raw lock expiry (1 h single / 6 h
+  multipart). `holder`/`acquiredAt` appear **only if the service operator has
+  explicitly enabled full disclosure mode**; treat them as absent, and if they
+  do appear, do not surface another user's identity or activity to your user.
+- `CHECKSUM_CONFLICT` — your `expectedChecksum` no longer matches: someone
+  else changed the file after you read it. `retryable: false`, and **do not
+  auto-retry by refreshing the checksum**: re-sending your original bytes with
+  the new `expectedChecksum` silently overwrites the other user's change —
+  the exact lost update this guard exists to prevent. Correct handling:
+  re-fetch the **content**, re-derive your change on top of the updated
+  content, recompute both checksums, then PUT — or, when a merge isn't
+  possible, stop and surface the conflict to the user.
 
-The `code` sits at the top level of the body on some endpoints and inside a
-`detail` object on others — check both: `body.code ?? body.detail?.code`.
+**Where the `code` lives — pinned per endpoint** (do not probe blindly):
+
+| Endpoint | 409 body shape |
+| --- | --- |
+| `POST /v1/files`, `PUT /v1/files/{fileId}` | code nested: `body.detail.code`, with `message`, `retryable` alongside |
+| `GET /v1/files/{fileId}/upload` (resume) | code at top level: `body.code`, `retryAfterSeconds` alongside (nullable) |
+| Filename conflicts (`POST /v1/files`, `PATCH /v1/files/{fileId}`) | **no code** — plain error body; branch on context, not `code` |
 
 ```bash
 curl -X PUT "https://data.spuree.com/api/v1/files/{fileId}" \
@@ -403,14 +417,19 @@ curl -X DELETE "https://data.spuree.com/api/v1/files/{fileId}" \
    Body: <file binary>
    ```
 
-   > **Signing profiles — the header set depends on HOW you send the PUT.**
-   > A hand-rolled request (curl, urllib, fetch) sends exactly the two headers
-   > above. An **AWS SDK** client additionally injects
-   > `x-amz-sdk-checksum-algorithm: CRC32` automatically — the presigned URL
-   > supports both profiles, so let the SDK do it. What fails is **mixing
-   > profiles**: adding the SDK header to a hand-rolled request, or stripping
-   > it from an SDK request, produces `SignatureDoesNotMatch`. (This exact
-   > mismatch broke an independently-built partner client in the field.)
+   > **Signing profiles — each presigned URL is signed for ONE exact header
+   > set.** You choose it at create/update time via the optional
+   > `uploadHeaderProfile` request field: `"aws-sdk"` (the default — also
+   > signs `x-amz-sdk-checksum-algorithm: CRC32`, which AWS SDK clients
+   > inject automatically) or `"direct"` (signs only the two headers above —
+   > for hand-rolled curl/urllib/fetch requests). The response tells you what
+   > your URL was signed for: `uploadHeaderProfile`, and `requiredHeaders` —
+   > **the exact headers and values to send. Echo `requiredHeaders`
+   > verbatim** rather than assembling headers from documentation, and
+   > sending more or fewer signed headers than your URL expects produces
+   > `SignatureDoesNotMatch` (the exact mismatch that broke an
+   > independently-built partner client in the field). Multipart **part**
+   > PUTs are unaffected — part URLs sign no checksum headers.
 
 4. **Complete the upload — REQUIRED (file is not visible until this is called):**
    ```
@@ -502,7 +521,7 @@ S3 key: `works_{workspaceId}/sess_{sessionId}/file_{fileId}`
 | 400 | Invalid checksum format, missing fields, bad ID | Fix input format |
 | 403 | No workspace access or edit permission | Check permissions |
 | 404 | File or session not found | Verify IDs |
-| 409 (`code: CHECKSUM_CONFLICT`) | File modified by another user | Re-fetch the file, recompute checksum, retry — not retryable as-is |
-| 409 (`code: UPLOAD_LOCK_CONFLICT`) | Another user is uploading | Retryable — wait `retryAfterSeconds` from the body when present, else lock expiry (1 h single / 6 h multipart). Holder identity is not disclosed by default |
+| 409 (`code: CHECKSUM_CONFLICT`) | File changed since you read it | Re-fetch the **content**, re-derive your change on top, recompute checksums, retry — or surface the conflict. **Never** re-send original bytes with a refreshed checksum (silent lost update) |
+| 409 (`code: UPLOAD_LOCK_CONFLICT`) | Another user is uploading | Wait `retryAfterSeconds` only when short (≲ 2 min); otherwise surface the lock to the user — never sleep toward the 1 h / 6 h expiry |
 | 409 (filename conflict) | Same name exists in target | Use different name or target |
 | 401 | Invalid or expired token | Refresh via **authentication** skill |
