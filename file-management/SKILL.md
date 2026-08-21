@@ -277,7 +277,22 @@ After receiving the response, upload to S3 then call `POST /v1/files/{fileId}/up
 | Code | Description |
 | --- | --- |
 | 200 | Lock acquired, presigned URL(s) returned |
-| 409 | Checksum mismatch or locked by another user |
+| 409 | Checksum mismatch or locked by another user — disambiguate by the body's `code` (see **409 conflict codes** below) |
+
+**409 conflict codes.** Conflict bodies carry a machine-readable `code`, so an
+agent never has to guess which situation it is in:
+
+- `UPLOAD_LOCK_CONFLICT` — another user holds the upload lock. `retryable: true`;
+  when `retryAfterSeconds` is present it is the seconds until the lock expires —
+  wait that long, then retry. The holder's identity and acquisition time are
+  **not disclosed by default** (privacy across workspaces); do not depend on
+  `holder`/`acquiredAt` being present.
+- `CHECKSUM_CONFLICT` — your `expectedChecksum` no longer matches the file
+  (someone else updated it). `retryable: false` as-is: re-fetch the file
+  (`GET /v1/files/{fileId}`), recompute the checksum, then retry the PUT.
+
+The `code` sits at the top level of the body on some endpoints and inside a
+`detail` object on others — check both: `body.code ?? body.detail?.code`.
 
 ```bash
 curl -X PUT "https://data.spuree.com/api/v1/files/{fileId}" \
@@ -388,6 +403,15 @@ curl -X DELETE "https://data.spuree.com/api/v1/files/{fileId}" \
    Body: <file binary>
    ```
 
+   > **Signing profiles — the header set depends on HOW you send the PUT.**
+   > A hand-rolled request (curl, urllib, fetch) sends exactly the two headers
+   > above. An **AWS SDK** client additionally injects
+   > `x-amz-sdk-checksum-algorithm: CRC32` automatically — the presigned URL
+   > supports both profiles, so let the SDK do it. What fails is **mixing
+   > profiles**: adding the SDK header to a hand-rolled request, or stripping
+   > it from an SDK request, produces `SignatureDoesNotMatch`. (This exact
+   > mismatch broke an independently-built partner client in the field.)
+
 4. **Complete the upload — REQUIRED (file is not visible until this is called):**
    ```
    POST /v1/files/{fileId}/upload/complete
@@ -478,7 +502,7 @@ S3 key: `works_{workspaceId}/sess_{sessionId}/file_{fileId}`
 | 400 | Invalid checksum format, missing fields, bad ID | Fix input format |
 | 403 | No workspace access or edit permission | Check permissions |
 | 404 | File or session not found | Verify IDs |
-| 409 (checksum mismatch) | File modified by another user | Re-fetch checksum, retry |
-| 409 (upload lock) | Another user is uploading | Wait (lock expires in 1 hour for single, 6 hours for multipart) |
+| 409 (`code: CHECKSUM_CONFLICT`) | File modified by another user | Re-fetch the file, recompute checksum, retry — not retryable as-is |
+| 409 (`code: UPLOAD_LOCK_CONFLICT`) | Another user is uploading | Retryable — wait `retryAfterSeconds` from the body when present, else lock expiry (1 h single / 6 h multipart). Holder identity is not disclosed by default |
 | 409 (filename conflict) | Same name exists in target | Use different name or target |
 | 401 | Invalid or expired token | Refresh via **authentication** skill |
