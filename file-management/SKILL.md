@@ -182,7 +182,7 @@ The caller **must** then upload to S3 **and** call `POST /v1/files/{fileId}/uplo
 | `checksum` | string | No | CRC32 base64 (8 chars) for end-to-end verification. When provided, the presigned URL is signed with the checksum and S3 verifies the upload matches. |
 | `uploadHeaderProfile` | string | No | Signing profile for the presigned URL: `aws-sdk` (default; for AWS SDK clients, additionally signs `x-amz-sdk-checksum-algorithm`) or `direct` (for hand-rolled HTTP clients). The response echoes the profile and the exact `requiredHeaders` to send. |
 
-**Response (single mode):** `{ messageCode, fileId, mode: "single", uploadUrl, checksumBase64, contentType }`
+**Response (single mode):** `{ messageCode, fileId, mode: "single", uploadUrl, checksumBase64, contentType, uploadHeaderProfile, requiredHeaders }` — `requiredHeaders` is the exact header map to send with the PUT; echo it verbatim.
 
 **Response (multipart mode):** `{ messageCode, fileId, mode: "multipart", parts: [{partNumber, startByte, endByte, url}, ...], totalParts, expiresAt }`
 
@@ -196,7 +196,7 @@ The caller **must** then upload to S3 **and** call `POST /v1/files/{fileId}/uplo
 curl -X POST "https://data.spuree.com/api/v1/files" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"fileName":"hero_walk","fileFormat":"fbx","fileSize":5242880,"sessionId":"...","checksum":"AAAAAA=="}'
+  -d '{"fileName":"hero_walk","fileFormat":"fbx","fileSize":5242880,"sessionId":"...","checksum":"AAAAAA==","uploadHeaderProfile":"direct"}'
 ```
 
 ---
@@ -266,8 +266,9 @@ Prepare a content update with optimistic concurrency. Acquires an upload lock. L
 | `expectedChecksum` | string | Yes | CRC32 base64 of current content (for conflict detection) |
 | `newChecksum` | string | Yes | CRC32 base64 of new content to upload |
 | `fileSize` | integer | No | Size in bytes. If ≥ 100 MB, returns multipart mode. |
+| `uploadHeaderProfile` | string | No | Signing profile for the presigned URL: `aws-sdk` (default) or `direct` for hand-rolled HTTP clients — same semantics as on `POST /v1/files`. |
 
-**Response (single):** `{ messageCode, fileId, mode: "single", uploadUrl, checksumBase64, contentType }`
+**Response (single):** `{ messageCode, fileId, mode: "single", uploadUrl, checksumBase64, contentType, uploadHeaderProfile, requiredHeaders }` — echo `requiredHeaders` verbatim on the PUT.
 
 **Response (multipart):** `{ messageCode, fileId, mode: "multipart", parts: [{partNumber, startByte, endByte, url}, ...], totalParts, expiresAt }`
 
@@ -284,13 +285,16 @@ After receiving the response, upload to S3 then call `POST /v1/files/{fileId}/up
 on the endpoints listed below, so an agent can branch without guessing:
 
 - `UPLOAD_LOCK_CONFLICT` — another user holds the upload lock; `retryable: true`.
-  When `retryAfterSeconds` is present, that is the seconds until the lock
-  expires. **Cap your patience**: wait it out only when it is short (≲ 2
-  minutes); otherwise — or after a second conflict — stop and surface the lock
-  to the user. Never sleep toward the raw lock expiry (1 h single / 6 h
-  multipart). `holder`/`acquiredAt` appear **only if the service operator has
-  explicitly enabled full disclosure mode**; treat them as absent, and if they
-  do appear, do not surface another user's identity or activity to your user.
+  A retry hint (`retryAfterSeconds`, seconds until the lock expires) exists
+  **only on the resume endpoint** — `POST`/`PUT` lock conflicts carry no
+  timing hint. Policy: on `POST`/`PUT`, retry **once** after a short fixed
+  backoff (30–60 s); on resume, wait `retryAfterSeconds` only when short
+  (≲ 2 minutes). In every case, after one failed retry stop and surface the
+  lock to the user — never sleep toward the raw lock expiry (1 h single /
+  6 h multipart). `holder`/`acquiredAt` appear **only if the service operator
+  has explicitly enabled full disclosure mode**; treat them as absent, and if
+  they do appear, do not surface another user's identity or activity to your
+  user.
 - `CHECKSUM_CONFLICT` — your `expectedChecksum` no longer matches: someone
   else changed the file after you read it. `retryable: false`, and **do not
   auto-retry by refreshing the checksum**: re-sending your original bytes with
@@ -300,13 +304,17 @@ on the endpoints listed below, so an agent can branch without guessing:
   content, recompute both checksums, then PUT — or, when a merge isn't
   possible, stop and surface the conflict to the user.
 
-**Where the `code` lives — pinned per endpoint** (do not probe blindly):
+**Where the `code` lives — pinned per endpoint:**
 
 | Endpoint | 409 body shape |
 | --- | --- |
-| `POST /v1/files`, `PUT /v1/files/{fileId}` | code nested: `body.detail.code`, with `message`, `retryable` alongside |
-| `GET /v1/files/{fileId}/upload` (resume) | code at top level: `body.code`, `retryAfterSeconds` alongside (nullable) |
-| Filename conflicts (`POST /v1/files`, `PATCH /v1/files/{fileId}`) | **no code** — plain error body; branch on context, not `code` |
+| `POST /v1/files`, `PUT /v1/files/{fileId}` — upload/checksum conflicts | code nested: `body.detail.code`, with `message` and `retryable` alongside (no `retryAfterSeconds` here) |
+| `GET /v1/files/{fileId}/upload` (resume) | code at top level: `body.code` (nullable), `retryAfterSeconds` alongside |
+| Filename conflicts (`POST /v1/files`, `PATCH /v1/files/{fileId}`) | **no code** — plain error body |
+
+`POST /v1/files` can return either of two 409s; the discriminator is the
+field itself: **`body.detail.code` present ⇒ upload/checksum conflict;
+absent ⇒ filename conflict** (use a different name or target).
 
 ```bash
 curl -X PUT "https://data.spuree.com/api/v1/files/{fileId}" \
@@ -403,13 +411,19 @@ curl -X DELETE "https://data.spuree.com/api/v1/files/{fileId}" \
    CHECKSUM=$(python3 -c "import base64, zlib, sys; print(base64.b64encode(zlib.crc32(open('$FILE_PATH','rb').read()).to_bytes(4,'big')).decode())")
    ```
 
-2. **Create file record** — `sessionId` is the target project or folder:
+2. **Create file record** — `sessionId` is the target project or folder.
+   This flow is a hand-rolled HTTP client, so request the `direct` profile
+   (without it, the default `aws-sdk` profile signs an extra header your
+   client will not send — see the signing-profiles note below):
    ```
-   POST /v1/files { fileName, fileFormat, fileSize, sessionId, checksum }
-   → { fileId, mode: "single", uploadUrl, checksumBase64, contentType }
+   POST /v1/files { fileName, fileFormat, fileSize, sessionId, checksum,
+                    uploadHeaderProfile: "direct" }
+   → { fileId, mode: "single", uploadUrl, checksumBase64, contentType,
+       uploadHeaderProfile: "direct", requiredHeaders }
    ```
 
-3. **Upload binary to S3:**
+3. **Upload binary to S3 — send exactly the headers in `requiredHeaders`**
+   (for the `direct` profile they are the two shown):
    ```
    PUT {uploadUrl}
    Content-Type: {contentType}
@@ -522,6 +536,6 @@ S3 key: `works_{workspaceId}/sess_{sessionId}/file_{fileId}`
 | 403 | No workspace access or edit permission | Check permissions |
 | 404 | File or session not found | Verify IDs |
 | 409 (`code: CHECKSUM_CONFLICT`) | File changed since you read it | Re-fetch the **content**, re-derive your change on top, recompute checksums, retry — or surface the conflict. **Never** re-send original bytes with a refreshed checksum (silent lost update) |
-| 409 (`code: UPLOAD_LOCK_CONFLICT`) | Another user is uploading | Wait `retryAfterSeconds` only when short (≲ 2 min); otherwise surface the lock to the user — never sleep toward the 1 h / 6 h expiry |
+| 409 (`code: UPLOAD_LOCK_CONFLICT`) | Another user is uploading | POST/PUT: retry once after 30–60 s (no timing hint in the body). Resume: wait `retryAfterSeconds` when short (≲ 2 min). Then surface to the user — never sleep toward the 1 h / 6 h expiry |
 | 409 (filename conflict) | Same name exists in target | Use different name or target |
 | 401 | Invalid or expired token | Refresh via **authentication** skill |
