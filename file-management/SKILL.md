@@ -190,7 +190,7 @@ The caller **must** then upload to S3 **and** call `POST /v1/files/{fileId}/uplo
 | --- | --- |
 | 200 | Record created, presigned URL(s) returned |
 | 404 | Session not found |
-| 409 | File already exists |
+| 409 | Two distinct conflicts — discriminate by `body.detail.code`: **present** ⇒ upload/checksum conflict (see **409 conflict codes** under `PUT /v1/files/{fileId}`; do NOT retry with a mutated name); **absent** ⇒ filename conflict (use a different name or target) |
 
 ```bash
 curl -X POST "https://data.spuree.com/api/v1/files" \
@@ -299,17 +299,20 @@ on the endpoints listed below, so an agent can branch without guessing:
   else changed the file after you read it. `retryable: false`, and **do not
   auto-retry by refreshing the checksum**: re-sending your original bytes with
   the new `expectedChecksum` silently overwrites the other user's change —
-  the exact lost update this guard exists to prevent. Correct handling:
-  re-fetch the **content**, re-derive your change on top of the updated
-  content, recompute both checksums, then PUT — or, when a merge isn't
-  possible, stop and surface the conflict to the user.
+  the exact lost update this guard exists to prevent. **Default handling:
+  stop and surface the conflict to the user** — for binary or large assets
+  (`fbx`, `png`, video…) there is nothing to merge, and
+  `GET /v1/files/{fileId}/content` returns 415/413 for them anyway. Only for
+  text-like files where your change can be mechanically re-derived: re-fetch
+  the content, re-apply your change on top of the updated content, recompute
+  both checksums, then PUT.
 
 **Where the `code` lives — pinned per endpoint:**
 
 | Endpoint | 409 body shape |
 | --- | --- |
 | `POST /v1/files`, `PUT /v1/files/{fileId}` — upload/checksum conflicts | code nested: `body.detail.code`, with `message` and `retryable` alongside (no `retryAfterSeconds` here) |
-| `GET /v1/files/{fileId}/upload` (resume) | code at top level: `body.code` (nullable), `retryAfterSeconds` alongside |
+| `GET /v1/files/{fileId}/upload` (resume) | code at top level: `body.code` (nullable), `retryAfterSeconds` alongside. **`code` null/absent ⇒ "not in pending status" — not retryable: do not wait, surface to the user** |
 | Filename conflicts (`POST /v1/files`, `PATCH /v1/files/{fileId}`) | **no code** — plain error body |
 
 `POST /v1/files` can return either of two 409s; the discriminator is the
@@ -320,7 +323,7 @@ absent ⇒ filename conflict** (use a different name or target).
 curl -X PUT "https://data.spuree.com/api/v1/files/{fileId}" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"expectedChecksum": "a1b2...","newChecksum": "f6e5..."}'
+  -d '{"expectedChecksum": "a1b2...","newChecksum": "f6e5...","uploadHeaderProfile":"direct"}'
 ```
 
 ---
@@ -342,7 +345,7 @@ Resume a multipart upload. Returns which parts are already in S3 and fresh presi
 | --- | --- |
 | 200 | Success |
 | 400 | No active multipart upload |
-| 409 | Not in pending status or locked by another user |
+| 409 | Two causes, discriminated by top-level `body.code`: `UPLOAD_LOCK_CONFLICT` (locked by another user — retryable, `retryAfterSeconds` alongside) or **`code` null/absent** (not in pending status — **not retryable**: do not wait, surface to the user) |
 
 ```bash
 curl "https://data.spuree.com/api/v1/files/{fileId}/upload" \
@@ -412,9 +415,9 @@ curl -X DELETE "https://data.spuree.com/api/v1/files/{fileId}" \
    ```
 
 2. **Create file record** — `sessionId` is the target project or folder.
-   This flow is a hand-rolled HTTP client, so request the `direct` profile
-   (without it, the default `aws-sdk` profile signs an extra header your
-   client will not send — see the signing-profiles note below):
+   This flow is a hand-rolled HTTP client, so it requests the `direct`
+   profile to keep the header set minimal (optional — the correctness rule
+   is echoing the response's `requiredHeaders`; see the note below):
    ```
    POST /v1/files { fileName, fileFormat, fileSize, sessionId, checksum,
                     uploadHeaderProfile: "direct" }
@@ -431,19 +434,21 @@ curl -X DELETE "https://data.spuree.com/api/v1/files/{fileId}" \
    Body: <file binary>
    ```
 
-   > **Signing profiles — each presigned URL is signed for ONE exact header
-   > set.** You choose it at create/update time via the optional
-   > `uploadHeaderProfile` request field: `"aws-sdk"` (the default — also
-   > signs `x-amz-sdk-checksum-algorithm: CRC32`, which AWS SDK clients
-   > inject automatically) or `"direct"` (signs only the two headers above —
-   > for hand-rolled curl/urllib/fetch requests). The response tells you what
-   > your URL was signed for: `uploadHeaderProfile`, and `requiredHeaders` —
-   > **the exact headers and values to send. Echo `requiredHeaders`
-   > verbatim** rather than assembling headers from documentation, and
-   > sending more or fewer signed headers than your URL expects produces
-   > `SignatureDoesNotMatch` (the exact mismatch that broke an
-   > independently-built partner client in the field). Multipart **part**
-   > PUTs are unaffected — part URLs sign no checksum headers.
+   > **Signing profiles — one rule guarantees correctness: echo the
+   > response's `requiredHeaders` verbatim.** Each presigned URL is signed
+   > for ONE exact header set, and `requiredHeaders` IS that set — sending
+   > more or fewer signed headers produces `SignatureDoesNotMatch` (the
+   > exact mismatch that broke an independently-built partner client in the
+   > field). Echoing works from any HTTP client under either profile.
+   >
+   > The `uploadHeaderProfile` request field (`"aws-sdk"` default /
+   > `"direct"`) only chooses **which** set your URL is signed for:
+   > `aws-sdk` additionally signs `x-amz-sdk-checksum-algorithm: CRC32`
+   > (AWS SDK clients inject it automatically), `direct` signs just the two
+   > headers above. Requesting `direct` from a hand-rolled client is a
+   > convenience — it keeps `requiredHeaders` down to the two headers you
+   > were sending anyway — not a correctness requirement. Multipart
+   > **part** PUTs are unaffected — part URLs sign no checksum headers.
 
 4. **Complete the upload — REQUIRED (file is not visible until this is called):**
    ```
@@ -535,7 +540,7 @@ S3 key: `works_{workspaceId}/sess_{sessionId}/file_{fileId}`
 | 400 | Invalid checksum format, missing fields, bad ID | Fix input format |
 | 403 | No workspace access or edit permission | Check permissions |
 | 404 | File or session not found | Verify IDs |
-| 409 (`code: CHECKSUM_CONFLICT`) | File changed since you read it | Re-fetch the **content**, re-derive your change on top, recompute checksums, retry — or surface the conflict. **Never** re-send original bytes with a refreshed checksum (silent lost update) |
+| 409 (`code: CHECKSUM_CONFLICT`) | File changed since you read it | Default: surface the conflict to the user. Text-like files only: re-fetch content, re-apply your change on top, recompute checksums, retry. **Never** re-send original bytes with a refreshed checksum (silent lost update) |
 | 409 (`code: UPLOAD_LOCK_CONFLICT`) | Another user is uploading | POST/PUT: retry once after 30–60 s (no timing hint in the body). Resume: wait `retryAfterSeconds` when short (≲ 2 min). Then surface to the user — never sleep toward the 1 h / 6 h expiry |
 | 409 (filename conflict) | Same name exists in target | Use different name or target |
 | 401 | Invalid or expired token | Refresh via **authentication** skill |
