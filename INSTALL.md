@@ -2,7 +2,7 @@
 
 There are two ways to hook an AI tool up to Spuree, and they suit different clients:
 
-- **Connector (OAuth MCP)** — paste a URL into your client, sign in through your browser, and approve access once; from then on your AI tool can work with your Spuree projects directly. (Behind the scenes: MCP is the standard protocol AI tools use to talk to services, and OAuth is the browser sign-in that authorizes it.) No keys to copy, revocable from your Spuree account at any time. Best for hosted and chat-style clients (claude.ai surfaces, ChatGPT). The server URL for Claude surfaces is `https://spuree.com/mcp`; ChatGPT uses its own URL (see [ChatGPT](#chatgpt)).
+- **Connector (OAuth MCP)** — paste a URL into your client, sign in through your browser, and approve access once; from then on your AI tool can work with your Spuree projects directly. (Behind the scenes: MCP is the standard protocol AI tools use to talk to services, and OAuth is the browser sign-in that authorizes it.) No keys to copy, revocable from your Spuree account at any time. Best for hosted and chat-style clients (claude.ai surfaces, ChatGPT). The server URL for Claude surfaces is `https://studio.spuree.com/mcp`; ChatGPT uses its own URL (see [ChatGPT](#chatgpt)).
 - **Skills + API key** — install the [Spuree skill docs](https://github.com/CheehooLabs/SpureeSkills) into your agent and authenticate against the REST API with an API key. Best for CLI agents (Codex, OpenClaw, Hermes, local Claude Code) and for the full V1 API surface, including binary file uploads, which the hosted connector does not offer.
 
 **Before you start:** you need a Spuree account — sign up at [studio.spuree.com](https://studio.spuree.com). Three domains appear in this guide: **spuree.com** is the main site, **studio.spuree.com** is the web app (and where the consent screen you'll approve is shown), and **data.spuree.com** is the API host.
@@ -18,7 +18,7 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 | ChatGPT (web) | ✅ read-only | — | Paid plan required; uses its own server URL (see [ChatGPT](#chatgpt)); exposes `search`, `fetch`, and `getting_started` only |
 | Codex (CLI / IDE) | — | ✅ | Codex's MCP OAuth login isn't compatible with Spuree's OAuth server today |
 | OpenClaw | — | ✅ | The Spuree MCP endpoint is OAuth-only; OpenClaw's native MCP client doesn't support OAuth flows |
-| Hermes Agent (CLI / desktop) | — | ✅ | Hermes's MCP OAuth login requires dynamic client registration, which Spuree's OAuth server doesn't offer |
+| Hermes Agent (CLI / desktop) | ✅ | ✅ | The server entry must pin the pre-registered `hermes-agent` client id (see [Hermes Agent](#hermes-agent)) |
 
 ✅ = supported · ◐ = possible but not the recommended path · — = not supported
 
@@ -30,13 +30,13 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 
 **Connector path (recommended):**
 
-1. On claude.ai, open **Customize > Connectors** ([claude.ai/customize/connectors](https://claude.ai/customize/connectors)). Pick Spuree from the directory if it's listed, or add it as a custom connector with server URL `https://spuree.com/mcp`. On Team/Enterprise plans, an Owner adds it in **Organization settings > Connectors** first; members then connect individually.
+1. On claude.ai, open **Customize > Connectors** ([claude.ai/customize/connectors](https://claude.ai/customize/connectors)). Pick Spuree from the directory if it's listed, or add it as a custom connector with server URL `https://studio.spuree.com/mcp`, then expand **Advanced settings** and set **OAuth Client ID** to `anthropic-claude-code`, leaving the client secret blank — Spuree's OAuth server has no dynamic client registration, so without the pre-registered id the connection fails. On Team/Enterprise plans, an Owner adds it in **Organization settings > Connectors** first; members then connect individually.
 2. Your browser opens Spuree's consent screen on studio.spuree.com — **Authorize** plus your client's name — listing four scopes (see [Using the connector](#using-the-connector)). Click **Allow**.
 3. In Claude Code, make sure you're logged in with your claude.ai account — run `/status` to check. Connectors do **not** load when your session authenticates via `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, an `apiKeyHelper`, Bedrock/Vertex, or a setup token.
 4. Run `/mcp` — connectors from claude.ai appear with a claude.ai indicator. In the desktop app you can also manage them under **Settings > Connectors**.
 5. Verify with a read-only call: ask *"List my Spuree projects"*.
 
-> **Advanced:** You can try adding the server directly with `claude mcp add --transport http spuree https://spuree.com/mcp` and authenticating via `/mcp` or `claude mcp login spuree`. However, Spuree's OAuth server does not support dynamic client registration, so this direct flow may fail with *"does not support dynamic client registration"*. If it does, use the claude.ai connector path above.
+> **Advanced:** You can try adding the server directly with `claude mcp add --transport http spuree https://studio.spuree.com/mcp` and authenticating via `/mcp` or `claude mcp login spuree`. However, Spuree's OAuth server does not support dynamic client registration, so this direct flow may fail with *"does not support dynamic client registration"*. If it does, use the claude.ai connector path above.
 
 **Skills + API key path:**
 
@@ -46,7 +46,7 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 
 ### Claude Code on the web and Claude Cowork
 
-1. Add Spuree once at the account level: on claude.ai, open **Customize > Connectors**, click **+** / **Add custom connector**, and paste `https://spuree.com/mcp` (or select Spuree from the directory if listed). On Team/Enterprise plans, an Owner adds it in **Organization settings > Connectors** first; members then connect individually.
+1. Add Spuree once at the account level: on claude.ai, open **Customize > Connectors**, click **+** / **Add custom connector**, and paste `https://studio.spuree.com/mcp` (or select Spuree from the directory if listed). Expand **Advanced settings** and set **OAuth Client ID** to `anthropic-claude-code`, leaving the client secret blank — Spuree's OAuth server has no dynamic client registration, so without the pre-registered id the connection fails. On Team/Enterprise plans, an Owner adds it in **Organization settings > Connectors** first; members then connect individually.
 2. Approve Spuree's **Authorize** consent screen.
 3. **Claude Code on the web:** log in to [claude.ai/code](https://claude.ai/code) with the same account and start a new session — connectors added in claude.ai are provisioned into web sessions automatically.
 4. **Claude Cowork:** no separate setup. Control which connectors are active via the **+** menu in the chat box or the **Customize > Connectors** page.
@@ -58,11 +58,12 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 
 Custom connectors require a paid ChatGPT plan — Plus, Pro, Business/Team, Enterprise, or Edu; they're not available on the free tier. Exact menu naming varies as ChatGPT evolves; on current ChatGPT you may need to enable Developer mode first.
 
-1. Open **Settings > Connectors > Advanced** and enable **Developer mode**.
-2. Go to **Settings > Connectors > Create** (on some builds: **Custom connectors > Add**).
-3. Name the connector **Spuree**, paste the server URL `https://spuree.com/mcp/chatgpt`, and leave authentication set to **OAuth**. ChatGPT has its own adapter endpoint — don't use the `https://spuree.com/mcp` URL meant for Claude surfaces.
-4. ChatGPT redirects to studio.spuree.com and shows Spuree's **Authorize ChatGPT** consent screen. Click **Allow**. The screen lists all four scopes — approval is all-or-nothing in v1 — but the ChatGPT surface can only ever call its three read-only tools, so the `write`, `invite`, and `render` scopes are never exercised there.
-5. The connector appears in the tool picker — start a new chat; existing chats won't see the connector.
+1. Open **Settings > Security and login** and enable **Developer mode** (this moved — it used to live under **Settings > Connectors > Advanced**).
+2. Go to **Plugins** (labelled **Connectors** or **Apps** on older builds) and click **+** to create a developer-mode app for a remote MCP server.
+3. Name the connector **Spuree**, paste the server URL `https://studio.spuree.com/mcp/chatgpt`, and leave authentication set to **OAuth**. ChatGPT has its own adapter endpoint — don't use the `https://studio.spuree.com/mcp` URL meant for Claude surfaces.
+4. Open **Advanced OAuth settings** and set **OAuth Client ID** to `openai-chatgpt`, leave the client secret blank, and set **Token endpoint auth method** to `none` — Spuree's OAuth server has no dynamic client registration, so without the pre-registered id the connection fails. Tick **I understand and want to continue** under the custom-MCP-server warning, then click **Create**.
+5. ChatGPT redirects to studio.spuree.com and shows Spuree's **Authorize ChatGPT** consent screen. Click **Allow**. The screen lists all four scopes — approval is all-or-nothing in v1 — but the ChatGPT surface can only ever call its three read-only tools, so the `write`, `invite`, and `render` scopes are never exercised there.
+6. The connector appears in the tool picker — start a new chat, open the **+** menu, choose **Developer mode**, and select **Spuree** for that conversation; existing chats won't see the connector.
 
 **What you get in ChatGPT:** a read-only surface with exactly three tools — `search` (full-text search with links into Spuree), `fetch` (read a file or list a project/folder's children), and `getting_started` (the onboarding guide). The full `project_*` / `folder_*` / `file_*` tool set is **not** available from ChatGPT, and asking for those tools returns an unknown-tool error.
 
@@ -87,7 +88,7 @@ The connector path is not available for Codex today (Codex's MCP OAuth login req
 
 ### OpenClaw
 
-The connector path is not available for OpenClaw today: the Spuree MCP endpoint is OAuth-only, and OpenClaw's native MCP client supports only static headers. API keys work **only** against the REST API at data.spuree.com — a static-header MCP config pointed at `https://spuree.com/mcp` cannot work. Use skills + an API key instead.
+The connector path is not available for OpenClaw today: the Spuree MCP endpoint is OAuth-only, and OpenClaw's native MCP client supports only static headers. API keys work **only** against the REST API at data.spuree.com — a static-header MCP config pointed at `https://studio.spuree.com/mcp` cannot work. Use skills + an API key instead.
 
 Skills are documentation, not MCP tools — nothing new appears in OpenClaw's tool list. The agent calls the REST API directly, so it needs shell/HTTP tooling enabled.
 
@@ -100,7 +101,29 @@ Skills are documentation, not MCP tools — nothing new appears in OpenClaw's to
 
 ### Hermes Agent
 
-The connector path is not available for Hermes today (Hermes's MCP OAuth login requires dynamic client registration, which Spuree's OAuth server doesn't offer). Use skills + an API key:
+**Connector path (recommended):**
+
+Hermes lets a server entry pin its OAuth client id, and `hermes-agent` is Spuree's pre-registered client id for Hermes — that pairing is what makes the connector work without dynamic client registration, which Spuree's OAuth server doesn't offer.
+
+1. In Hermes, open **Capabilities > MCP** and add Spuree to `mcp.json`:
+
+   ```json
+   {
+     "mcpServers": {
+       "spuree": {
+         "url": "https://studio.spuree.com/mcp",
+         "oauth": { "client_id": "hermes-agent" }
+       }
+     }
+   }
+   ```
+
+   The `oauth.client_id` line is required — without it, Hermes attempts dynamic client registration and fails with *"Invalid registration response"*. Keep the server key named `spuree` exactly: Hermes builds its OAuth callback URL from that name, and only this one is registered for the client id — renaming the entry makes the browser sign-in fail.
+2. Save, then click **Authenticate** on the new server entry. Your browser opens Spuree's consent screen listing four scopes (see [Using the connector](#using-the-connector)). Click **Allow**.
+3. Start a new session — `mcp.json` changes apply after an MCP reload, so existing sessions won't see the server.
+4. Verify: ask *"List my Spuree projects"*. The agent should call the Spuree connector tools and show your projects. No API key is needed on this path.
+
+**Skills + API key path:**
 
 The Hermes CLI and the Hermes Desktop app share one home directory (`~/.hermes` on macOS and Linux, `%LOCALAPPDATA%\hermes` on Windows), so the steps below cover both.
 
@@ -217,7 +240,7 @@ If your projects come back as JSON, you're connected.
 | `403 insufficient_scope` | The token lacks a required scope | Revoke at [studio.spuree.com/account/connections](https://studio.spuree.com/account/connections), then reconnect to re-consent to the full scope set |
 | Spuree missing from `/mcp` in Claude Code | Session isn't authenticated with a claude.ai subscription login | Run `/status`; connectors don't load when `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `apiKeyHelper`, Bedrock/Vertex, or a setup token is active |
 | *"does not support dynamic client registration"* when direct-adding in Claude Code | Spuree's OAuth server has no dynamic client registration | Add Spuree on claude.ai instead ([claude.ai/customize/connectors](https://claude.ai/customize/connectors)) and let it flow into Claude Code |
-| No way to add a connector in ChatGPT Settings | Free tier (custom connectors need a paid plan), or Developer mode isn't enabled | Upgrade to a paid plan (Plus, Pro, Business/Team, Enterprise, Edu), then enable **Settings > Connectors > Advanced > Developer mode** (naming varies as ChatGPT evolves) |
+| No way to add a connector in ChatGPT Settings | Free tier (custom connectors need a paid plan), or Developer mode isn't enabled | Upgrade to a paid plan (Plus, Pro, Business/Team, Enterprise, Edu), then enable **Settings > Security and login > Developer mode** (naming varies as ChatGPT evolves) |
 | Unknown-tool error in ChatGPT for `project_list` etc. | ChatGPT's Spuree surface has only `search`, `fetch`, and `getting_started` | Use those three tools; the full tool set is available on Claude surfaces |
 | Connector doesn't appear in an existing conversation | Connectors are picked up at session start | Start a new chat — existing chats won't see the connector |
 | `401` when refreshing a JWT | Refresh tokens are single-use; an old one was reused, or the 30-day refresh token expired | Log in again and store the newest `refresh_token` after every refresh |
@@ -226,7 +249,7 @@ If your projects come back as JSON, you're connected.
 | Truncated results on large listings in Claude Code | MCP tool output is capped at 25,000 tokens by default | Raise the cap with the `MAX_MCP_OUTPUT_TOKENS` environment variable, or narrow the request |
 | Skills installed, but the agent doesn't see them | The install didn't target your client — Claude Code reads `.claude/skills/`, which is only created when you select **Claude Code** in the installer's agent picker — or the agent was launched in a different folder than the install (project-level installs are only visible from that folder, for every client) | Re-run `npx skills add …` and select your client in the picker; launch the agent in the folder you installed into |
 | Hermes: the key works in the CLI, but the desktop app says no key is set | The desktop agent doesn't inherit shell exports or Windows User-scope variables | Put the key in Hermes's `.env` file (`~/.hermes/.env`, Windows: `%LOCALAPPDATA%\hermes\.env`), quit the desktop app including the tray icon, relaunch |
-| Hermes MCP server entry fails with *"Invalid registration response"* | Spuree's OAuth server has no dynamic client registration | Remove the server entry and use the skills + API key path |
+| Hermes MCP server entry fails with *"Invalid registration response"* | The server entry has no `oauth.client_id`, so Hermes falls back to dynamic client registration, which Spuree's OAuth server doesn't offer | Add `"oauth": { "client_id": "hermes-agent" }` to the server entry, save, and authenticate again |
 | `401 {"detail": "Invalid API key"}` on a V1 call | The key reached the API but doesn't exist or was revoked (a rotated-out key in a stale environment is the classic cause) | Create a new key at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys), update it everywhere it's stored, and restart the client |
 | `401 "Authentication required…"` on a V1 call | No credential was sent at all — `SPUREE_API_KEY` isn't visible to the client's process | Set the variable and **fully restart** the client (environment variables are read at process start) |
 
