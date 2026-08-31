@@ -7,7 +7,7 @@ description: Add, list, resolve, update, and delete line-anchored review comment
 
 ## Overview
 
-Line-anchored review comments on files. Comments reference specific line ranges and preserve the annotated source text. Supports one level of threaded replies, pending/resolved status tracking, and @mentions of users with access to the file.
+Review comments on files. A comment is anchored either to a line range, preserving the annotated source text, or — on a video — to a millisecond offset on its timeline. Supports one level of threaded replies, pending/resolved status tracking, and @mentions of users with access to the file.
 
 Use this skill when an agent needs to:
 
@@ -126,7 +126,7 @@ surfaces: ["local", "desktop", "backend", "hosted-web"]
 webSafe: true
 -->
 
-Add a line-anchored review comment to a file, or reply to an existing comment thread. Omit `parentCommentId` for a new top-level comment (then `startLine`, `endLine`, and `sourceText` are required); provide it to reply to a top-level comment (one level of nesting only — replying to a reply is rejected). To @mention someone, embed `<@DisplayName|userId>` in the comment text — get user IDs from the mention-candidates endpoint.
+Add a review comment to a file, or reply to an existing comment thread. Omit `parentCommentId` for a new top-level comment — then supply **either** the line trio (`startLine`, `endLine`, `sourceText`) **or** a time `anchor` for a video, never both; provide `parentCommentId` to reply to a top-level comment (one level of nesting only — replying to a reply is rejected). To @mention someone, embed `<@DisplayName|userId>` in the comment text — get user IDs from the mention-candidates endpoint.
 
 **Request Body:**
 
@@ -137,6 +137,7 @@ Add a line-anchored review comment to a file, or reply to an existing comment th
 | `endLine` | integer | Top-level only | End line of the annotated range, >= `startLine`; required unless replying |
 | `sourceText` | string | Top-level only | Snapshot of the annotated source text, max 5000 chars; required unless replying |
 | `parentCommentId` | string | Reply only | ID of the top-level comment to reply to; omit for a new top-level comment |
+| `anchor` | object | Video only | `{"kind": "time", "startMs": <int>, "endMs": <int>}` — a millisecond offset into a video's timeline. Replaces the line trio, which must then be omitted. `endMs` defaults to `startMs` (a point comment) |
 
 **Response (201):**
 
@@ -321,6 +322,25 @@ curl "https://data.spuree.com/api/v1/files/64a7b8c9d1e2f3a4b5c6d7d0/mention-cand
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 ```
 
+## Time Anchors (video)
+
+A video has no lines, so a comment on one is anchored to a millisecond offset instead:
+
+```bash
+curl -X POST "https://data.spuree.com/api/v1/files/{fileId}/comments" \
+  -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"comment": "the arm pops here", "anchor": {"kind": "time", "startMs": 83400}}'
+```
+
+Milliseconds are canonical. Frame numbers are a display convention only — a file's fps comes from the annotation pipeline, is optional, and may be fractional (23.976), so nothing derived from it is stored. Convert for display with `frame = round(startMs / 1000 * fps)`.
+
+Sending `startLine`/`endLine`/`sourceText` alongside a time anchor is rejected (422) rather than ignored, so a mistake surfaces instead of silently storing a different comment than intended.
+
+Every top-level comment in a list response carries an `anchor`. Comments written before time anchors existed report `{"kind": "line", ...}` synthesized from their line fields, so one code path reads both. Video comments come back in timeline order.
+
+A timecode means something only against the cut it was written on. Comments record the file version they were left against; a replaced video may leave older timecodes pointing at different shots.
+
 ## Mentions
 
 To @mention a user in comment text, embed a mention token:
@@ -349,7 +369,8 @@ Only users with access to the file can be mentioned; tokens for other users are 
 | `comment` | string | Comment text (may contain mention tokens) |
 | `startLine` | integer? | Start line (top-level comments only) |
 | `endLine` | integer? | End line (top-level comments only) |
-| `sourceText` | string? | Annotated source snapshot (top-level comments only) |
+| `sourceText` | string? | Annotated source snapshot (line-anchored top-level comments only) |
+| `anchor` | object? | Where the comment points: `{"kind": "line", "startLine", "endLine"}` or `{"kind": "time", "startMs", "endMs"}`. Always present on a top-level comment — line anchors are derived for comments written before time anchors existed. Absent on replies, which inherit their parent's |
 | `status` | string | `pending` or `resolved` |
 | `resolvedBy` | string? | `manual` or `regeneration` |
 | `parentCommentId` | string? | Parent comment ID (replies only) |
