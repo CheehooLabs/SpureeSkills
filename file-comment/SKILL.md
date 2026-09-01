@@ -126,7 +126,7 @@ surfaces: ["local", "desktop", "backend", "hosted-web"]
 webSafe: true
 -->
 
-Add a review comment to a file, or reply to an existing comment thread. Omit `parentCommentId` for a new top-level comment — then supply **either** the line trio (`startLine`, `endLine`, `sourceText`) **or** an `anchor` for a video or image, never both; provide `parentCommentId` to reply to a top-level comment (one level of nesting only — replying to a reply is rejected). To @mention someone, embed `<@DisplayName|userId>` in the comment text — get user IDs from the mention-candidates endpoint.
+Add a review comment to a file, or reply to an existing comment thread. Omit `parentCommentId` for a new top-level comment — then supply **either** the line trio (`startLine`, `endLine`, `sourceText`) **or** an `anchor` for a video or image, never both; provide `parentCommentId` to reply to a top-level comment (one level of nesting only — replying to a reply is rejected). A reply carries neither the line trio nor an `anchor`: it inherits its parent's, and sending one is rejected (422) rather than stored, so the anchor on a thread has exactly one author. To @mention someone, embed `<@DisplayName|userId>` in the comment text — get user IDs from the mention-candidates endpoint.
 
 **Request Body:**
 
@@ -137,7 +137,7 @@ Add a review comment to a file, or reply to an existing comment thread. Omit `pa
 | `endLine` | integer | Top-level only | End line of the annotated range, >= `startLine`; required unless replying |
 | `sourceText` | string | Top-level only | Snapshot of the annotated source text, max 5000 chars; required unless replying |
 | `parentCommentId` | string | Reply only | ID of the top-level comment to reply to; omit for a new top-level comment |
-| `anchor` | object | Video / image | `{"kind": "time", "startMs": <int>, "endMs": <int>}` for a video, or `{"kind": "image"}` for a still. Replaces the line trio, which must then be omitted. `endMs` defaults to `startMs` (a point comment); an `image` anchor takes neither `startMs` nor line fields |
+| `anchor` | object | Top-level only | `{"kind": "time", "startMs": <int>, "endMs": <int>}` for a video, or `{"kind": "image"}` for a still. Replaces the line trio, which must then be omitted. `endMs` defaults to `startMs` (a point comment); an `image` anchor takes neither `startMs` nor line fields; a reply takes no `anchor` at all |
 | `anchor.drawing` | array | Optional | Marks on the picture. Read it back to see what a reviewer circled; **do not author one** — see Drawings below |
 
 **Response (201):**
