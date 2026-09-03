@@ -1,13 +1,13 @@
 ---
 name: file-comment
-description: Add, list, resolve, update, and delete line-anchored review comments on files, including threaded replies and @mentions
+description: Add, list, resolve, update, and delete review comments on files — anchored to a line range, to a moment on a video's timeline, or to a still — including marks drawn on the picture, threaded replies and @mentions
 ---
 
 # File Comments
 
 ## Overview
 
-Line-anchored review comments on files. Comments reference specific line ranges and preserve the annotated source text. Supports one level of threaded replies, pending/resolved status tracking, and @mentions of users with access to the file.
+Review comments on files. A comment is anchored to one of three things: a line range, preserving the annotated source text; a millisecond offset on a video's timeline; or a still, which has no timeline at all. A video or image comment may also carry a **drawing** — marks placed on the picture itself. Supports one level of threaded replies, pending/resolved status tracking, and @mentions of users with access to the file.
 
 Use this skill when an agent needs to:
 
@@ -126,7 +126,7 @@ surfaces: ["local", "desktop", "backend", "hosted-web"]
 webSafe: true
 -->
 
-Add a line-anchored review comment to a file, or reply to an existing comment thread. Omit `parentCommentId` for a new top-level comment (then `startLine`, `endLine`, and `sourceText` are required); provide it to reply to a top-level comment (one level of nesting only — replying to a reply is rejected). To @mention someone, embed `<@DisplayName|userId>` in the comment text — get user IDs from the mention-candidates endpoint.
+Add a review comment to a file, or reply to an existing comment thread. Omit `parentCommentId` for a new top-level comment — then supply **either** the line trio (`startLine`, `endLine`, `sourceText`) **or** an `anchor` for a video or image, never both; provide `parentCommentId` to reply to a top-level comment (one level of nesting only — replying to a reply is rejected). A reply carries neither the line trio nor an `anchor`: it inherits its parent's, and sending one is rejected (422) rather than stored, so the anchor on a thread has exactly one author. To @mention someone, embed `<@DisplayName|userId>` in the comment text — get user IDs from the mention-candidates endpoint.
 
 **Request Body:**
 
@@ -137,6 +137,8 @@ Add a line-anchored review comment to a file, or reply to an existing comment th
 | `endLine` | integer | Top-level only | End line of the annotated range, >= `startLine`; required unless replying |
 | `sourceText` | string | Top-level only | Snapshot of the annotated source text, max 5000 chars; required unless replying |
 | `parentCommentId` | string | Reply only | ID of the top-level comment to reply to; omit for a new top-level comment |
+| `anchor` | object | Top-level only | `{"kind": "time", "startMs": <int>, "endMs": <int>}` for a video, or `{"kind": "image"}` for a still. Replaces the line trio, which must then be omitted. `endMs` defaults to `startMs` (a point comment); an `image` anchor takes neither `startMs` nor line fields; a reply takes no `anchor` at all |
+| `anchor.drawing` | array | Optional | Marks on the picture. Read it back to see what a reviewer circled; **do not author one** — see Drawings below |
 
 **Response (201):**
 
@@ -321,6 +323,62 @@ curl "https://data.spuree.com/api/v1/files/64a7b8c9d1e2f3a4b5c6d7d0/mention-cand
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 ```
 
+## Time Anchors (video)
+
+A video has no lines, so a comment on one is anchored to a millisecond offset instead:
+
+```bash
+curl -X POST "https://data.spuree.com/api/v1/files/{fileId}/comments" \
+  -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"comment": "the arm pops here", "anchor": {"kind": "time", "startMs": 83400}}'
+```
+
+Milliseconds are canonical. Frame numbers are a display convention only — a file's fps comes from the annotation pipeline, is optional, and may be fractional (23.976), so nothing derived from it is stored. Convert for display with `frame = floor(startMs / 1000 * fps)` — **floor, not round**. A frame occupies an interval, so the frame on screen at a given moment is the one whose interval contains it; rounding names the next frame for anything past the halfway point (83 400ms at 24fps is inside frame 2001, but rounds to 2002).
+
+Sending `startLine`/`endLine`/`sourceText` alongside a time anchor is rejected (422) rather than ignored, so a mistake surfaces instead of silently storing a different comment than intended.
+
+Every top-level comment in a list response carries an `anchor`. Comments written before time anchors existed report `{"kind": "line", ...}` synthesized from their line fields, so one code path reads both. Video comments come back in timeline order.
+
+A timecode means something only against the cut it was written on. Comments record the file version they were left against in `fileVersion` (the file's checksum at write time); a replaced video may leave older timecodes pointing at different shots, and normalized coordinates stay in range across a re-upload, so a mark can silently land on whatever now occupies that moment. Compare `fileVersion` against the file's current checksum before trusting a mark's position. It is absent on comments written before the field existed — treat that as unknown, never as a match.
+
+## Image Anchors (stills)
+
+A still has no timeline, so its comment carries only the anchor kind — and, if the reviewer drew one, a drawing:
+
+```bash
+curl -X POST "https://data.spuree.com/api/v1/files/{fileId}/comments" \
+  -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"comment": "the crop is tight on the left", "anchor": {"kind": "image"}}'
+```
+
+Sending `startMs`/`endMs` on an `image` anchor is rejected (422), as is sending line fields. A still has no zero, so a timecode on one would be a number nobody wrote — the refusal exists so a client that picked the wrong `kind` finds out rather than storing a comment that claims a moment.
+
+Image comments come back in creation order. A video's come back in timeline order: there is a timeline to walk, and there isn't one here.
+
+## Drawings
+
+A video or image comment may carry marks drawn on the picture — a rectangle, ellipse, arrow or freehand stroke:
+
+```jsonc
+"anchor": {
+  "kind": "time", "startMs": 83400,
+  "drawing": [
+    { "type": "ellipse", "color": "#ff3b30", "points": [[0.43, 0.13], [0.58, 0.42]] },
+    { "type": "arrow",   "color": "#34c759", "points": [[0.80, 0.81], [0.54, 0.57]] }
+  ]
+}
+```
+
+Coordinates are normalized 0..1 against the picture's **displayed content box** — the letterboxed area the picture occupies, not the element around it. That is what lets a mark survive a resize, a different screen, or a re-encode at another resolution. `rect`, `ellipse` and `arrow` take exactly two points (opposite corners, the bounding box, or tail-then-head); `path` takes two or more. Colour is `#rrggbb` and belongs to the shape, not the comment, so one note can mark two things in two colours. At most 24 shapes per drawing and 256 points per shape.
+
+**Read drawings; do not write them.** Every field above is returned on a read, and a client that renders comments should render the marks. But an agent composing a comment cannot see the frame, so any coordinates it emits are a guess dressed as a measurement — a circle placed confidently over the wrong part of the picture is worse feedback than no circle at all. Leave a time- or image-anchored comment with words, and let a human draw.
+
+Out-of-range coordinates are rejected rather than clamped: a value outside 0..1 means the caller's content-box maths was wrong, and pinning the mark to a border would hide that from every future reader.
+
+A drawing on a `line` anchor is refused — text has no picture to draw on.
+
 ## Mentions
 
 To @mention a user in comment text, embed a mention token:
@@ -349,12 +407,16 @@ Only users with access to the file can be mentioned; tokens for other users are 
 | `comment` | string | Comment text (may contain mention tokens) |
 | `startLine` | integer? | Start line (top-level comments only) |
 | `endLine` | integer? | End line (top-level comments only) |
-| `sourceText` | string? | Annotated source snapshot (top-level comments only) |
+| `sourceText` | string? | Annotated source snapshot (line-anchored top-level comments only) |
+| `anchor` | object? | Where the comment points: `{"kind": "line", "startLine", "endLine"}`, `{"kind": "time", "startMs", "endMs"}`, or `{"kind": "image"}`. Always present on a top-level comment — line anchors are derived for comments written before time anchors existed. Absent on replies, which inherit their parent's |
+| `anchor.drawing` | array? | Marks on the picture, on a `time` or `image` anchor. Each is `{ type, color, points }` with normalized 0..1 coordinates — see Drawings |
+| `fileVersion` | string? | The file's checksum when the comment was written. Compare against the file's current checksum before trusting a mark's position. Absent on older comments, which means unknown, not matching |
 | `status` | string | `pending` or `resolved` |
 | `resolvedBy` | string? | `manual` or `regeneration` |
 | `parentCommentId` | string? | Parent comment ID (replies only) |
 | `author` | object? | `{ id, name, image }` |
 | `canEdit` | boolean | Whether the caller may edit or delete this comment |
+| `authorKind` | string? | `agent` when the comment was written through an API key or OAuth client on someone's behalf; absent or `human` otherwise (pre-existing, ENG-6140) |
 | `newlyMentioned` | array? | User IDs newly @mentioned by this write (create and update responses only) |
 | `replies` | array? | Nested replies (list endpoint only) |
 | `createdAt` | datetime | Creation timestamp |
