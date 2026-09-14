@@ -33,17 +33,19 @@ agent uses to decide whether to load the skill, so name the operations it covers
 in plain words.
 
 **Base URLs.** Write `https://data.spuree.com/api` and `https://studio.spuree.com`
-exactly like that. Other distributions of these skills rewrite those exact
-strings to select an environment, so a variant spelling (another host, a trailing
-slash) silently escapes the rewrite.
+exactly like that. Cheehoo's internal distribution rewrites those exact strings to
+select an environment, so a Spuree URL written any other way (for example, a
+different host name) silently escapes the rewrite.
 
 **Examples.** Use placeholders such as `$SPUREE_API_KEY` and
 `$SPUREE_ACCESS_TOKEN`, never a real credential.
 
 **Contract checker.** `scripts/check-folder-discovery-contract.mjs` pins the exact
 wording of the search, folder-discovery, and children-listing contracts in
-`file-management`, `folder-management`, and `project-management`, plus the
-folder-discovery walkthrough in `getting-started`. When it fails:
+`file-management`, `folder-management`, and `project-management`, and the
+folder-discovery walkthrough in `getting-started`. It also checks the canonical
+Studio URL formats in all seven skills, so an edit to any skill can trip it. When
+it fails:
 
 - If you changed that behavior by accident, restore the wording.
 - If the API really changed, update the checker in the same pull request and add a
@@ -80,9 +82,9 @@ test in the same pull request as the workflow.
 ## Opening a pull request
 
 **Branch.** Branch from an up-to-date `main`, or fork the repository if you do not
-have write access. Never push to `main` directly, even for a typo. Cheehoo staff:
-use the branch name Linear generates for the ticket, such as
-`cadeskao/eng-5209-document-pr-guidelines-for-internal-and-public-spuree-skills`.
+have write access. Never push to `main` directly, even for a typo. Name the
+branch `<your-handle>/<ticket>-<short-description>` when there is a ticket, or
+`<your-handle>/<short-description>` otherwise.
 
 **Scope.** One concern per pull request.
 
