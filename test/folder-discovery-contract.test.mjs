@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  LEGACY_CURSOR_SUNSET_ISO,
   loadSkillDocuments,
   validateFolderDiscoveryContract,
 } from "../scripts/check-folder-discovery-contract.mjs";
@@ -321,28 +320,29 @@ test("rejects missing signed cursor integrity semantics", () => {
   assert(result.includes("file-management: signed cursor integrity semantics are missing"));
 });
 
-test("rejects an unbounded legacy-cursor migration", () => {
+const UNSIGNED_CURSOR_ERROR = "file-management: unsigned pre-v1 cursors must be documented as rejected";
+
+test("rejects search copy that stops saying unsigned cursors are rejected", () => {
   const result = validateFolderDiscoveryContract(
     changed("file", (markdown) =>
       markdown
-        .replace("Unsigned pre-v1 cursors are treated as unbound `any`-mode compatibility tokens", "Legacy cursors work as compatibility tokens")
-        .replace("regardless of a re-sent `matchMode`", "and inherit every re-sent match mode")
-        .replace("only until **2026-09-07 00:00 UTC**", "during migration")
-        .replace("At and after the sunset,\nevery unsigned cursor is rejected", "Unsigned cursors may remain accepted"),
+        .replace("Unsigned pre-v1 cursors are no longer accepted.", "Legacy cursors work as compatibility tokens.")
+        .replace("every unsigned cursor now returns 422", "unsigned cursors keep working"),
     ),
   );
-  assert(result.includes("file-management: bounded legacy cursor migration must be explicit"));
+  assert(result.includes(UNSIGNED_CURSOR_ERROR));
 });
 
-test("turns the legacy-cursor sunset into an explicit maintenance failure", () => {
-  const result = validateFolderDiscoveryContract(documents, {
-    now: LEGACY_CURSOR_SUNSET_ISO,
-  });
-  assert(
-    result.includes(
-      `file-management: legacy cursor migration copy expired at ${LEGACY_CURSOR_SUNSET_ISO}; remove the unsigned-cursor compatibility guidance and update this guard`,
+test("rejects search copy that still promises a legacy-cursor compatibility window", () => {
+  const result = validateFolderDiscoveryContract(
+    changed("file", (markdown) =>
+      markdown.replace(
+        "Unsigned pre-v1 cursors are no longer accepted.",
+        "Unsigned pre-v1 cursors are no longer accepted. Older tokens remain accepted\nonly until the next release.",
+      ),
     ),
   );
+  assert(result.includes(UNSIGNED_CURSOR_ERROR));
 });
 
 test("rejects incomplete generic search status documentation", () => {
