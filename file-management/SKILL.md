@@ -57,7 +57,7 @@ and uses an opaque cursor for pagination.
 | `createdAfter` | string | No | — | ISO 8601 lower bound on source `createdAt`. **Timezone required** (`Z` or `±HH:MM`) — naive datetimes → 422. |
 | `createdBefore` | string | No | — | ISO 8601 upper bound. Timezone required. |
 | `limit` | integer | No | 50 | Page size (1–200). |
-| `cursor` | string | No | — | Opaque pagination token from a previous response. Replay the original `q` and every corpus-shaping filter. Newly issued cursors use HMAC-signed `v1` envelopes and bind that corpus. Unsigned pre-v1 cursors remain accepted as unbound `any`-mode compatibility tokens only until 2026-09-07 00:00 UTC and must never be reused with another corpus. |
+| `cursor` | string | No | — | Opaque pagination token from a previous response. Replay the original `q` and every corpus-shaping filter. Cursors are HMAC-signed `v1` envelopes that bind that corpus; an unsigned pre-v1 cursor returns 422. |
 | `sortBy` | string | No | `relevance` | Result ordering: `relevance` \| `createdAt`. |
 | `sortOrder` | string | No | `desc` | Direction for `sortBy=createdAt`: `asc` \| `desc`. Ignored for relevance, which is always descending. |
 | `includePreview` | boolean | No | `false` | When `true`, **`asset`** results add a short-lived signed `previewUrl` (~1h) and `previewFileFormat` for the cover image/video. Other source types are unaffected; the raw bucket/key pointer is never returned. |
@@ -156,13 +156,10 @@ cursor returns 422. If a previously valid cursor returns 422 after the caller's
 permission scope changes, discard it and restart from page one with the same
 query and filters; do not retry the rejected cursor.
 
-Unsigned pre-v1 cursors are treated as unbound `any`-mode compatibility tokens,
-regardless of a re-sent `matchMode`, only until **2026-09-07 00:00 UTC**. During
-that bounded migration window, a fully stripped and re-encoded modern payload
-is statelessly indistinguishable from a genuine v0 token, so keep any unsigned
-cursor only within its original pagination sequence. At and after the sunset,
-every unsigned cursor is rejected; only a valid signed `v1` envelope is
-accepted.
+Unsigned pre-v1 cursors are no longer accepted. Their migration window closed at
+**2026-09-07 00:00 UTC**; every unsigned cursor now returns 422, and only a valid
+signed `v1` envelope is accepted. Discard an unsigned cursor and restart from
+page one with the same query and filters.
 
 **Status Codes:**
 
@@ -172,7 +169,7 @@ accepted.
 | 400 | `search_query_too_broad`: query would match at least the bounded threshold; refine the terms. |
 | 401 | Invalid or expired credential. |
 | 403 | OAuth credential lacks the `read` scope. |
-| 422 | Missing/invalid parameter, timezone-less date, malformed narrowing ID, malformed/tampered/mismatched cursor, or an unsigned cursor at/after the migration sunset. |
+| 422 | Missing/invalid parameter, timezone-less date, malformed narrowing ID, malformed/tampered/mismatched cursor, or any unsigned pre-v1 cursor. |
 | 500 | Non-transient search or canonical-storage failure. |
 | 503 | `search_context_unavailable`: canonical validation could not safely advance a stale-only page. |
 
