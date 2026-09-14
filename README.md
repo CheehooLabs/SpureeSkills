@@ -38,7 +38,7 @@ Connect Claude Code, Claude Code Web & Cowork, ChatGPT, Codex, or OpenClaw — v
 | [Project Management](./project-management/SKILL.md) | Create, list, update, delete, and share projects; browse contents |
 | [Folder Management](./folder-management/SKILL.md) | Find canonical folders in one bounded call, list recent folders, and create, update, delete, browse, or download folder content |
 | [File Management](./file-management/SKILL.md) | Get, create, upload, update, and delete files with checksum-verified uploads (includes name search) |
-| [File Comments](./file-comment/SKILL.md) | Add, list, resolve, update, and delete line-anchored review comments on files, with threaded replies and @mentions |
+| [File Comments](./file-comment/SKILL.md) | Add, list, resolve, update, and delete review comments on files — anchored to a line range, a video timecode, or a still — with drawings, threaded replies, and @mentions |
 | [Project Invitations](./project-invitation/SKILL.md) | Manage sharing invitations for non-workspace members |
 
 ## Authentication
@@ -51,6 +51,11 @@ All skills use the V1 API. Two authentication methods are supported:
 | API key | `X-API-Key: <key>` | Automation and long-lived access |
 
 See the [Authentication skill](./authentication/SKILL.md) for details on obtaining tokens and managing API keys.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to edit a skill, the checks to
+run, and what a pull request needs before it can merge.
 
 ## Contract checks and diagnostics
 
