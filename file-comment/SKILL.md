@@ -133,9 +133,9 @@ Add a review comment to a file, or reply to an existing comment thread. Omit `pa
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `comment` | string | Yes | Comment text, max 2000 chars. May contain @mention tokens — see the Mentions section; get user IDs from the mention-candidates endpoint |
-| `startLine` | integer | Line anchors only | Start line of the annotated range (1-based). Required on a top-level comment without an `anchor`; omit it when sending an `anchor` or replying |
-| `endLine` | integer | Line anchors only | End line of the annotated range, >= `startLine`. Required on a top-level comment without an `anchor`; omit it when sending an `anchor` or replying |
-| `sourceText` | string | Line anchors only | Snapshot of the annotated source text, max 5000 chars. Required on a top-level comment without an `anchor`; omit it when sending an `anchor` or replying |
+| `startLine` | integer | Line comments only | Start line of the annotated range (1-based). Required on a top-level comment unless it sends a `time` or `image` anchor; omit it with one of those anchors or when replying |
+| `endLine` | integer | Line comments only | End line of the annotated range, >= `startLine`. Required on a top-level comment unless it sends a `time` or `image` anchor; omit it with one of those anchors or when replying |
+| `sourceText` | string | Line comments only | Snapshot of the annotated source text, max 5000 chars. Required on a top-level comment unless it sends a `time` or `image` anchor; omit it with one of those anchors or when replying |
 | `parentCommentId` | string | Reply only | ID of the top-level comment to reply to; omit for a new top-level comment |
 | `anchor` | object | Top-level only | `{"kind": "time", "startMs": <int>, "endMs": <int>}` for a video, or `{"kind": "image"}` for a still. Replaces the line trio, which must then be omitted. `endMs` defaults to `startMs` (a point comment); an `image` anchor takes neither `startMs` nor line fields; a reply takes no `anchor` at all |
 | `anchor.drawing` | array | Optional | Marks on the picture. Read it back to see what a reviewer circled; **do not author one** — see Drawings below |
@@ -176,7 +176,7 @@ Add a review comment to a file, or reply to an existing comment thread. Omit `pa
 | 401 | Invalid or expired token |
 | 403 | No edit access to this file |
 | 404 | File not found |
-| 422 | Invalid body — a top-level comment with neither the full line trio (`startLine`, `endLine`, `sourceText`) nor an `anchor`; line fields sent with a `time` or `image` anchor; an `anchor` on a reply; a `time` anchor without `startMs`, or `startMs`/`endMs` on an `image` anchor; `endLine` < `startLine` or `endMs` < `startMs`; a drawing on a line anchor or with coordinates outside 0..1; or `comment`/`sourceText` over its length limit |
+| 422 | Invalid body — a top-level comment with neither the full line trio (`startLine`, `endLine`, `sourceText`) nor a `time` or `image` anchor (a `line` anchor does not replace the trio); line fields sent with a `time` or `image` anchor; an `anchor` on a reply; a `parentCommentId` that is not a valid id; a `time` anchor without `startMs`, or `startMs`/`endMs` on an `image` anchor; `endLine` < `startLine` or `endMs` < `startMs`; a drawing on a line anchor or with coordinates outside 0..1; or `comment`/`sourceText` over its length limit |
 | 500 | Internal server error |
 
 **Example:**
@@ -447,7 +447,7 @@ Only users with access to the file can be mentioned; tokens for other users are 
 
 | Error | Cause | Resolution |
 | --- | --- | --- |
-| 422 (invalid body) | A top-level comment with neither the line trio nor an `anchor`, line fields sent together with a `time` or `image` anchor, an `anchor` on a reply, an anchor field that does not fit its `kind`, or a field over its length limit | Read the error detail, then send exactly one anchor form for the file: the full line trio for text, a `time` anchor for a video, or an `image` anchor for a still — never line fields alongside an `anchor`. For a reply, send `parentCommentId` and no anchor |
+| 422 (invalid body) | A top-level comment with neither the line trio nor a `time` or `image` anchor (a `line` anchor does not replace the trio), line fields sent together with a `time` or `image` anchor, an `anchor` on a reply, a `parentCommentId` that is not a valid id, an anchor field that does not fit its `kind`, or a field over its length limit | Read the error detail, then send exactly one form for the file: the full line trio for text, a `time` anchor for a video, or an `image` anchor for a still — never line fields alongside a `time` or `image` anchor. For a reply, send the exact `id` of a top-level comment as `parentCommentId` and no anchor |
 | 400 (nested reply) | `parentCommentId` points at a reply | Reply to the top-level comment instead |
 | 400 (bad parent) | `parentCommentId` doesn't match a top-level comment on this file | Verify the parent comment id |
 | 401 (unauthorized) | Expired or invalid token | Refresh via the **authentication** skill |
