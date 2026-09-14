@@ -133,9 +133,9 @@ Add a review comment to a file, or reply to an existing comment thread. Omit `pa
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `comment` | string | Yes | Comment text, max 2000 chars. May contain @mention tokens — see the Mentions section; get user IDs from the mention-candidates endpoint |
-| `startLine` | integer | Top-level only | Start line of the annotated range (1-based); required unless replying |
-| `endLine` | integer | Top-level only | End line of the annotated range, >= `startLine`; required unless replying |
-| `sourceText` | string | Top-level only | Snapshot of the annotated source text, max 5000 chars; required unless replying |
+| `startLine` | integer | Line anchors only | Start line of the annotated range (1-based). Required on a top-level comment without an `anchor`; omit it when sending an `anchor` or replying |
+| `endLine` | integer | Line anchors only | End line of the annotated range, >= `startLine`. Required on a top-level comment without an `anchor`; omit it when sending an `anchor` or replying |
+| `sourceText` | string | Line anchors only | Snapshot of the annotated source text, max 5000 chars. Required on a top-level comment without an `anchor`; omit it when sending an `anchor` or replying |
 | `parentCommentId` | string | Reply only | ID of the top-level comment to reply to; omit for a new top-level comment |
 | `anchor` | object | Top-level only | `{"kind": "time", "startMs": <int>, "endMs": <int>}` for a video, or `{"kind": "image"}` for a still. Replaces the line trio, which must then be omitted. `endMs` defaults to `startMs` (a point comment); an `image` anchor takes neither `startMs` nor line fields; a reply takes no `anchor` at all |
 | `anchor.drawing` | array | Optional | Marks on the picture. Read it back to see what a reviewer circled; **do not author one** — see Drawings below |
@@ -151,6 +151,8 @@ Add a review comment to a file, or reply to an existing comment thread. Omit `pa
     "startLine": 42,
     "endLine": 45,
     "sourceText": "function processData(input) {...}",
+    "anchor": { "kind": "line", "startLine": 42, "endLine": 45 },
+    "fileVersion": "<file checksum when the comment was written>",
     "status": "pending",
     "resolvedBy": null,
     "parentCommentId": null,
@@ -174,7 +176,7 @@ Add a review comment to a file, or reply to an existing comment thread. Omit `pa
 | 401 | Invalid or expired token |
 | 403 | No edit access to this file |
 | 404 | File not found |
-| 422 | Invalid body — missing `startLine`/`endLine`/`sourceText` on a top-level comment, `endLine` < `startLine`, or `comment`/`sourceText` over its length limit |
+| 422 | Invalid body — a top-level comment with neither the full line trio (`startLine`, `endLine`, `sourceText`) nor an `anchor`; line fields sent with a `time` or `image` anchor; an `anchor` on a reply; a `time` anchor without `startMs`, or `startMs`/`endMs` on an `image` anchor; `endLine` < `startLine` or `endMs` < `startMs`; a drawing on a line anchor or with coordinates outside 0..1; or `comment`/`sourceText` over its length limit |
 | 500 | Internal server error |
 
 **Example:**
@@ -375,7 +377,7 @@ Coordinates are normalized 0..1 against the picture's **displayed content box** 
 
 **Read drawings; do not write them.** Every field above is returned on a read, and a client that renders comments should render the marks. But an agent composing a comment cannot see the frame, so any coordinates it emits are a guess dressed as a measurement — a circle placed confidently over the wrong part of the picture is worse feedback than no circle at all. Leave a time- or image-anchored comment with words, and let a human draw.
 
-Out-of-range coordinates are rejected rather than clamped: a value outside 0..1 means the caller's content-box maths was wrong, and pinning the mark to a border would hide that from every future reader.
+Out-of-range coordinates are rejected (422) rather than clamped: a value outside 0..1 means the caller's content-box maths was wrong, and pinning the mark to a border would hide that from every future reader.
 
 A drawing on a `line` anchor is refused — text has no picture to draw on.
 
@@ -405,8 +407,8 @@ Only users with access to the file can be mentioned; tokens for other users are 
 | `id` | string | Comment ID |
 | `fileId` | string | File ID |
 | `comment` | string | Comment text (may contain mention tokens) |
-| `startLine` | integer? | Start line (top-level comments only) |
-| `endLine` | integer? | End line (top-level comments only) |
+| `startLine` | integer? | Start line (line-anchored top-level comments only) |
+| `endLine` | integer? | End line (line-anchored top-level comments only) |
 | `sourceText` | string? | Annotated source snapshot (line-anchored top-level comments only) |
 | `anchor` | object? | Where the comment points: `{"kind": "line", "startLine", "endLine"}`, `{"kind": "time", "startMs", "endMs"}`, or `{"kind": "image"}`. Always present on a top-level comment — line anchors are derived for comments written before time anchors existed. Absent on replies, which inherit their parent's |
 | `anchor.drawing` | array? | Marks on the picture, on a `time` or `image` anchor. Each is `{ type, color, points }` with normalized 0..1 coordinates — see Drawings |
@@ -445,7 +447,7 @@ Only users with access to the file can be mentioned; tokens for other users are 
 
 | Error | Cause | Resolution |
 | --- | --- | --- |
-| 422 (invalid body) | Top-level comment without `startLine`/`endLine`/`sourceText`, or a field over its length limit | Include the line range and source snapshot, or add `parentCommentId` to reply |
+| 422 (invalid body) | A top-level comment with neither the line trio nor an `anchor`, line fields sent together with a `time` or `image` anchor, an `anchor` on a reply, an anchor field that does not fit its `kind`, or a field over its length limit | Read the error detail, then send exactly one anchor form for the file: the full line trio for text, a `time` anchor for a video, or an `image` anchor for a still — never line fields alongside an `anchor`. For a reply, send `parentCommentId` and no anchor |
 | 400 (nested reply) | `parentCommentId` points at a reply | Reply to the top-level comment instead |
 | 400 (bad parent) | `parentCommentId` doesn't match a top-level comment on this file | Verify the parent comment id |
 | 401 (unauthorized) | Expired or invalid token | Refresh via the **authentication** skill |
