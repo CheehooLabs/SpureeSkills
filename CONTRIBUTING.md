@@ -33,9 +33,9 @@ agent uses to decide whether to load the skill, so name the operations it covers
 in plain words.
 
 **Base URLs.** Write `https://data.spuree.com/api` and `https://studio.spuree.com`
-exactly like that. Cheehoo's internal distribution rewrites those exact strings to
-select an environment, so a Spuree URL written any other way (for example, a
-different host name) silently escapes the rewrite.
+as those literal strings. Tooling that consumes this repository matches them
+exactly, so a Spuree URL written any other way (for example, a different host
+name) is missed.
 
 **Examples.** Use placeholders such as `$SPUREE_API_KEY` and
 `$SPUREE_ACCESS_TOKEN`, never a real credential.
@@ -44,8 +44,8 @@ different host name) silently escapes the rewrite.
 wording of the search, folder-discovery, and children-listing contracts in
 `file-management`, `folder-management`, and `project-management`, and the
 folder-discovery walkthrough in `getting-started`. It also checks the canonical
-Studio URL formats in all seven skills, so an edit to any skill can trip it. When
-it fails:
+Studio URL formats in every skill listed in its `SKILL_FILES`, so an edit to any of
+those skills can trip it. When it fails:
 
 - If you changed that behavior by accident, restore the wording.
 - If the API really changed, update the checker in the same pull request and add a
@@ -59,8 +59,9 @@ it fails:
 2. Update the **Available Skills** table in [README.md](./README.md).
 3. Update the skill list in `scripts/diagnose-spuree-skill-copies.mjs` and its
    test.
-4. When renaming or removing, also update `SKILL_FILES` in
-   `scripts/check-folder-discovery-contract.mjs`.
+4. Update `SKILL_FILES` in `scripts/check-folder-discovery-contract.mjs`. A new
+   skill left out of it passes the checker without its Studio URLs ever being
+   checked.
 5. In the pull request, call out the change under *Downstream impact*: every
    distribution that pins this repository lists skills by name and must add,
    rename, or remove it when it re-pins.
