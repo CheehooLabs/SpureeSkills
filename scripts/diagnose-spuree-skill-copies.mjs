@@ -15,6 +15,7 @@ export const TARGET_SKILLS = Object.freeze([
   "file-management",
   "folder-management",
   "getting-started",
+  "notification-center",
   "project-invitation",
   "project-management",
 ]);
