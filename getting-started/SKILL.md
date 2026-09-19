@@ -62,6 +62,12 @@ walking an entire folder tree.
 - “Share or unshare a project.”
 - “Show, accept, decline, cancel, or resend a project invitation.”
 
+For notification questions, use **notification-center** only when the connected
+service supports delegated reads and the client exposes the needed API/tool. It
+checks accessible file/folder/project activity and unread counts without marking
+read; it is not the complete inbox. Follow its OAuth/key scope and count rules.
+Do not claim notification support on a search/fetch-only connector.
+
 The public Spuree skills cover cloud storage and collaboration. Do not advertise
 internal creator capabilities such as motion or video generation.
 

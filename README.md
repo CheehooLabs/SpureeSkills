@@ -39,16 +39,22 @@ Connect Claude Code, Claude Code Web & Cowork, ChatGPT, Codex, or OpenClaw — v
 | [Folder Management](./folder-management/SKILL.md) | Find canonical folders in one bounded call, list recent folders, and create, update, delete, browse, or download folder content |
 | [File Management](./file-management/SKILL.md) | Get, create, upload, update, and delete files with checksum-verified uploads (includes name search) |
 | [File Comments](./file-comment/SKILL.md) | Add, list, resolve, update, and delete review comments on files — anchored to a line range, a video timecode, or a still — with drawings, threaded replies, and @mentions |
+| [Notification Center](./notification-center/SKILL.md) | Read connection-visible activity and unread counts without marking read; requires enabled delegated access |
 | [Project Invitations](./project-invitation/SKILL.md) | Manage sharing invitations for non-workspace members |
 
 ## Authentication
 
-All skills use the V1 API. Two authentication methods are supported:
+Skills document endpoint-specific authentication. Common credential methods are:
 
 | Method | Header | Use case |
 | --- | --- | --- |
 | JWT token | `Authorization: Bearer <token>` | Interactive sessions (1 hour expiry, refreshable) |
 | API key | `X-API-Key: <key>` | Automation and long-lived access |
+| OAuth access token | `Authorization: Bearer <token>` | Connected clients; required scopes and endpoint availability apply |
+
+Notification reads have stricter credential requirements: OAuth `read` or a V1
+key with explicit nonempty organization scope, plus enabled delegated access.
+They do not expose the complete inbox. See [Notification Center](./notification-center/SKILL.md).
 
 See the [Authentication skill](./authentication/SKILL.md) for details on obtaining tokens and managing API keys.
 
@@ -82,7 +88,7 @@ node scripts/diagnose-spuree-skill-copies.mjs --target /path/to/project --json
 
 When the checkout and target project differ, the checkout remains the immutable
 source reference while `--target` controls project/workspace discovery. The
-diagnostic scans all seven public skills across `.agents`, `.codex`, `.claude`,
+diagnostic scans all eight public skills across `.agents`, `.codex`, `.claude`,
 OpenClaw workspace/global, Hermes global, and Codex plugin-cache roots. It
 reports paths, SHA-256 hashes, catalog scan order, exposed names, and plugin
 namespace/version metadata. Collision groups use the exposed skill name, so a
