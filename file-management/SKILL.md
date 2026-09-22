@@ -177,9 +177,20 @@ page one with the same query and filters.
 
 ### GET /v1/files/{fileId}
 
-Get file metadata and presigned download URL.
+Get file metadata, a presigned download URL, and the file's search-index state.
 
-**Response:** `{ "data": { id, fileName, fileFormat, mimeType, size, workspaceId, sessionId, entitySessionId, downloadUrl, createdAt, updatedAt } }`
+**Response:** `{ "data": { id, fileName, fileFormat, mimeType, size, workspaceId, sessionId, entitySessionId, downloadUrl, createdAt, updatedAt, searchIndex } }`
+
+`searchIndex` is `{ state, reason, indexedVersion, attempt, failedAt }` (or `null` when the file has no `fileFormat`):
+
+| `state` | Meaning | What to do |
+| --- | --- | --- |
+| `processing` | The indexer reads this format and has not yet recorded a result for the file's current version. | Poll this endpoint (see [After upload](#after-upload-wait-until-the-file-is-searchable)). |
+| `ready` | Name and body are searchable as of `indexedVersion`. | Search. |
+| `not_indexable` | A property of the file stops its body being indexed; re-indexing will not change it. `reason` says which: `image_only` (scanned PDF, no text layer), `encrypted`, `oversize` (over 32 MB), `unsupported_format` (images, video, 3D — only the name is searchable), `extract_error` (bytes do not match the format). | Do not wait. Surface `reason` to the user. |
+| `failed` | The last indexing attempt failed. When `attempt` and `failedAt` are set the failure was final (retries exhausted); otherwise a later retry may succeed. | Do not poll on a final failure; surface it. |
+
+`unsupported_format` files report `not_indexable` on the first read, so a client never waits on a binary.
 
 ```bash
 curl "https://data.spuree.com/api/v1/files/{fileId}" \
@@ -474,6 +485,39 @@ curl -X DELETE "https://data.spuree.com/api/v1/files/{fileId}" \
    ```
 
 6. **To abort**, call `DELETE /v1/files/{fileId}/upload` to clean up S3 parts.
+
+### After upload: wait until the file is searchable
+
+Indexing is asynchronous. A file that `upload/complete` has just accepted is
+not in `GET /v1/search` results yet, and a `PUT` content update takes the file
+out of `ready` until its new bytes are indexed. Do not search and retry blindly;
+read the state:
+
+1. `GET /v1/files/{fileId}` and look at `data.searchIndex.state`.
+2. `processing` → wait and read again. Back off 1 s, 2 s, 4 s, … capped at 30 s
+   between reads. Give up after 5 minutes and report to the user that indexing
+   has not completed, rather than looping.
+3. `ready` → `GET /v1/search` will find the file's name and body.
+4. `not_indexable` or `failed` → stop. Waiting will not change it. Tell the user
+   the `reason` (a scanned PDF has no text to index; an encrypted PDF cannot be
+   read; an image or video has only its name indexed).
+
+```bash
+# Poll until ready, stop on a terminal state
+delay=1
+for i in $(seq 1 60); do
+  state=$(curl -s "https://data.spuree.com/api/v1/files/$FILE_ID" \
+    -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN" | python3 -c 'import json,sys; print((json.load(sys.stdin)["data"]["searchIndex"] or {}).get("state"))')
+  case "$state" in
+    ready) break ;;
+    not_indexable|failed) echo "content not searchable: $state"; break ;;
+  esac
+  sleep $delay; delay=$(( delay * 2 > 30 ? 30 : delay * 2 ))
+done
+```
+
+Typical upload-to-`ready` latency is under a second; a burst of many uploads
+queues behind one another and can take longer.
 
 ### Content Update Flow
 
