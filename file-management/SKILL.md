@@ -500,14 +500,23 @@ read the state:
 3. `ready` → `GET /v1/search` will find the file's name and body.
 4. `not_indexable` or `failed` → stop. Waiting will not change it. Tell the user
    the `reason` (a scanned PDF has no text to index; an encrypted PDF cannot be
-   read; an image or video has only its name indexed).
+   read; an image or video has only its name indexed). `failed` is terminal by
+   construction: the indexer writes it only on a message's last allowed
+   receive, after every retry is spent; a retryable failure writes no verdict
+   at all and the file keeps reading `processing`, so keep polling on that.
+5. A request that fails in transport (network error, 5xx, unparseable body) is
+   not a state. Treat it like `processing`: wait the same backoff and read
+   again, and give up at the same 5-minute mark.
 
 ```bash
 # Poll until ready, stop on a terminal state, give up after 5 minutes
 deadline=$(( $(date +%s) + 300 )); delay=1
 while :; do
-  state=$(curl -s "https://data.spuree.com/api/v1/files/$FILE_ID" \
-    -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN" | python3 -c 'import json,sys; print((json.load(sys.stdin)["data"]["searchIndex"] or {}).get("state"))')
+  # A transport failure or an unparseable body leaves state empty, which the
+  # case below treats like processing: same backoff, same 5-minute give-up.
+  state=$(curl -sf --max-time 20 "https://data.spuree.com/api/v1/files/$FILE_ID" \
+    -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN" 2>/dev/null \
+    | python3 -c 'import json,sys; print((json.load(sys.stdin)["data"]["searchIndex"] or {}).get("state") or "")' 2>/dev/null)
   case "$state" in
     ready) echo "searchable"; break ;;
     not_indexable|failed) echo "content not searchable: $state"; break ;;
