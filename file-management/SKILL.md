@@ -503,18 +503,25 @@ read the state:
    read; an image or video has only its name indexed).
 
 ```bash
-# Poll until ready, stop on a terminal state
-delay=1
-for i in $(seq 1 60); do
+# Poll until ready, stop on a terminal state, give up after 5 minutes
+deadline=$(( $(date +%s) + 300 )); delay=1
+while :; do
   state=$(curl -s "https://data.spuree.com/api/v1/files/$FILE_ID" \
     -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN" | python3 -c 'import json,sys; print((json.load(sys.stdin)["data"]["searchIndex"] or {}).get("state"))')
   case "$state" in
-    ready) break ;;
+    ready) echo "searchable"; break ;;
     not_indexable|failed) echo "content not searchable: $state"; break ;;
   esac
+  if [ "$(date +%s)" -ge "$deadline" ]; then
+    echo "indexing has not completed after 5 minutes (last state: $state); report this to the user instead of waiting longer"
+    break
+  fi
   sleep $delay; delay=$(( delay * 2 > 30 ? 30 : delay * 2 ))
 done
 ```
+
+The bound is elapsed time, not iteration count: with the 30 s cap a fixed
+iteration count would wait far longer than the rule above says.
 
 Typical upload-to-`ready` latency is under a second; a burst of many uploads
 queues behind one another and can take longer.
