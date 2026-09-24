@@ -47,16 +47,16 @@ and uses an opaque cursor for pagination.
 | Parameter | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `q` | string | Yes | — | Search query (1–255 chars). Full-text token match. |
-| `type` | string | No | — | Filter by source type: `file` \| `folder` \| `project` \| `asset`. Deprecated `workspace` remains accepted for compatibility and returns an empty page because workspace rows are not indexed. Omit for all. |
+| `type` | string | No | — | Filter by source type: `file` \| `folder` \| `project` \| `asset`. Deprecated `workspace` remains accepted for compatibility and returns an empty result because workspace rows are not indexed. Omit for all. |
 | `searchIn` | string | No | `all` | Indexed rows to search: `name` \| `content` (body + annotation) \| `all`. |
 | `matchMode` | string | No | `any` | Term matching inside each indexed row: `any` \| `all` \| `phrase`. `any` matches at least one analyzed term, `all` requires every analyzed term, and `phrase` requires ordered adjacent terms. |
 | `format` | string | No | — | Comma-separated file formats, e.g. `txt,md`. Applies to `file` type only. |
 | `entityType` | string | No | — | Comma-separated entity types, e.g. `character,prop`. Applies to `asset` type only. |
-| `workspaceId` | string | No | — | Restrict to a single workspace (ObjectId). Must be one the caller is a member of, else empty page; malformed id → 422. |
-| `projectId` | string | No | — | Restrict to a single project (ObjectId). Must be one the caller can access, else empty page; malformed id → 422. |
+| `workspaceId` | string | No | — | Restrict to a single workspace (ObjectId). Must be one the caller is a member of, else empty result; malformed id → 422. |
+| `projectId` | string | No | — | Restrict to a single project (ObjectId). Must be one the caller can access, else empty result; malformed id → 422. |
 | `createdAfter` | string | No | — | ISO 8601 lower bound on source `createdAt`. **Timezone required** (`Z` or `±HH:MM`) — naive datetimes → 422. |
 | `createdBefore` | string | No | — | ISO 8601 upper bound. Timezone required. |
-| `limit` | integer | No | 50 | Page size (1–200). |
+| `limit` | integer | No | 50 | Result page size (1–200). |
 | `cursor` | string | No | — | Opaque pagination token from a previous response. Replay the original `q` and every corpus-shaping filter. Cursors are HMAC-signed `v1` envelopes that bind that corpus; an unsigned pre-v1 cursor returns 422. |
 | `sortBy` | string | No | `relevance` | Result ordering: `relevance` \| `createdAt`. |
 | `sortOrder` | string | No | `desc` | Direction for `sortBy=createdAt`: `asc` \| `desc`. Ignored for relevance, which is always descending. |
@@ -66,7 +66,7 @@ and uses an opaque cursor for pagination.
 
 Continue pagination whenever `cursor` is non-null, even when `count` is smaller
 than the requested `limit`; canonical validation can suppress stale hits and
-produce a short page that still has another page.
+produce a short result set that still has a next cursor.
 
 Each `data` item is one matched source object. Common fields:
 
@@ -134,6 +134,7 @@ Each entry in `matches[]`:
 | `chunkIndex` | integer? | Body chunk index (content rows) |
 | `charOffset` | integer? | Char offset of the chunk within the file (content rows) |
 | `lineStart` | integer? | Starting line number of the chunk (content rows) |
+| `page` | integer? | 1-based physical PDF page of the matched chunk. Present only on `rowKind: "body"` hits of PDF files; absent on name hits, non-PDF files, and PDF rows not yet reindexed. A chunk never spans a page. When present, open the file at that page (`/files/{id}#page=N` in Studio or a viewer); when absent, open the file without a page fragment. |
 
 ```bash
 # Find files with any analyzed term from "hero"
@@ -144,7 +145,7 @@ curl "https://data.spuree.com/api/v1/search?q=hero&type=file" \
 curl "https://data.spuree.com/api/v1/search?q=quarterly%20report&type=file&searchIn=name&matchMode=phrase&projectId=...&format=txt,md&limit=50" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 
-# Next page: replay the original query and corpus-shaping parameters
+# Next result page: replay the original query and corpus-shaping parameters
 curl "https://data.spuree.com/api/v1/search?q=hero&type=file&cursor=<token>" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 ```
@@ -153,25 +154,25 @@ Newly issued HMAC-signed `v1` cursors also bind the caller's current permission
 scope. Treat a cursor as opaque; do not edit or reuse it with a different query,
 source type, filter set, or caller. A malformed, tampered, or mismatched bound
 cursor returns 422. If a previously valid cursor returns 422 after the caller's
-permission scope changes, discard it and restart from page one with the same
+permission scope changes, discard it and restart from the first result page with the same
 query and filters; do not retry the rejected cursor.
 
 Unsigned pre-v1 cursors are no longer accepted. Their migration window closed at
 **2026-09-07 00:00 UTC**; every unsigned cursor now returns 422, and only a valid
 signed `v1` envelope is accepted. Discard an unsigned cursor and restart from
-page one with the same query and filters.
+the first result page with the same query and filters.
 
 **Status Codes:**
 
 | Code | Description |
 | --- | --- |
-| 200 | One canonical search page returned. |
+| 200 | One canonical result page returned. |
 | 400 | `search_query_too_broad`: query would match at least the bounded threshold; refine the terms. |
 | 401 | Invalid or expired credential. |
 | 403 | OAuth credential lacks the `read` scope. |
 | 422 | Missing/invalid parameter, timezone-less date, malformed narrowing ID, malformed/tampered/mismatched cursor, or any unsigned pre-v1 cursor. |
 | 500 | Non-transient search or canonical-storage failure. |
-| 503 | `search_context_unavailable`: canonical validation could not safely advance a stale-only page. |
+| 503 | `search_context_unavailable`: canonical validation could not safely advance a stale-only result set. |
 
 ---
 
@@ -181,14 +182,23 @@ Get file metadata, a presigned download URL, and the file's search-index state.
 
 **Response:** `{ "data": { id, fileName, fileFormat, mimeType, size, workspaceId, sessionId, entitySessionId, downloadUrl, createdAt, updatedAt, searchIndex } }`
 
-`searchIndex` is `{ state, reason, indexedVersion, attempt, failedAt }` (or `null` when the file has no `fileFormat`):
+`searchIndex` is `{ state, reason, method, indexedVersion, attempt, failedAt }` (or `null` when the file has no `fileFormat`):
 
 | `state` | Meaning | What to do |
 | --- | --- | --- |
-| `processing` | The indexer reads this format and has not yet recorded a result for the file's current version. | Poll this endpoint (see [After upload](#after-upload-wait-until-the-file-is-searchable)). |
+| `processing` | The indexer reads this format and has not yet recorded a result for the file's current version. A scanned (image-only) PDF is OCR'd and can take ~10 s for a few pages, so `processing` on a PDF is normal for longer than on a text file. | Poll this endpoint (see [After upload](#after-upload-wait-until-the-file-is-searchable)). |
 | `ready` | Name and body are searchable as of `indexedVersion`. | Search. |
-| `not_indexable` | A property of the file stops its body being indexed; re-indexing will not change it. `reason` says which: `image_only` (scanned PDF, no text layer), `encrypted`, `oversize` (over 32 MB), `unsupported_format` (images, video, 3D — only the name is searchable), `extract_error` (bytes do not match the format). | Do not wait. Surface `reason` to the user. |
-| `failed` | The last indexing attempt failed. When `attempt` and `failedAt` are set the failure was final (retries exhausted); otherwise a later retry may succeed. | Do not poll on a final failure; surface it. |
+| `not_indexable` | A property of the file stops its body being indexed; re-indexing will not change it. `reason` says which: `image_only` (scanned PDF, no text layer, in an environment without OCR), `encrypted`, `oversize` (over 32 MB), `unsupported_format` (images, video, 3D — only the name is searchable), `extract_error` (bytes do not match the format). | Do not wait. Surface `reason` to the user. |
+| `failed` | The last indexing attempt failed. When `attempt` and `failedAt` are set the failure was final (retries exhausted); otherwise a later retry may succeed. `reason` values specific to `failed`: `ocr_no_text` (OCR ran on a scanned PDF and read no text on any page — blank or illegible scan), `ocr_timeout` (OCR ran out of its time budget before finishing a single page). | Do not poll on a final failure; surface it. |
+
+Additional fields on the verdict:
+
+| Field | Type | Present when | Description |
+| --- | --- | --- | --- |
+| `method` | `"text"` \| `"ocr"` | `state` = `ready`, PDF only | How the body was read: `text` from the file's own text layer, `ocr` from a rasterised scan. Null for text formats. |
+| `indexedVersion` | string | `state` != `processing` | ISO-8601 `updatedAt` of the file version this verdict was reached on. |
+| `attempt` | integer | terminal `failed` only | Receive count at which retries were exhausted. |
+| `failedAt` | string | terminal `failed` only | ISO-8601 instant of the last attempt. |
 
 `unsupported_format` files report `not_indexable` on the first read, so a client never waits on a binary.
 
