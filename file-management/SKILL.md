@@ -134,7 +134,13 @@ Each entry in `matches[]`:
 | `chunkIndex` | integer? | Body chunk index (content rows) |
 | `charOffset` | integer? | Char offset of the chunk within the file (content rows) |
 | `lineStart` | integer? | Starting line number of the chunk (content rows) |
-| `page` | integer? | 1-based physical PDF page of the matched chunk. Present only on `rowKind: "body"` hits of PDF files; absent on name hits, non-PDF files, and PDF rows not yet reindexed. A chunk never spans a page. When present, open the file at that page (`/files/{id}#page=N` in Studio or a viewer); when absent, open the file without a page fragment. |
+
+PDF body hits may also carry a `page` field (integer, 1-based physical PDF page
+of the matched chunk). Present only on `rowKind: "body"` hits of PDF files;
+absent on name hits, non-PDF files, and PDF rows not yet reindexed. A chunk
+never spans a page. When present, open the file at that page
+(`/files/{id}#page=N` in Studio or a viewer); when absent, open the file without
+a page fragment.
 
 ```bash
 # Find files with any analyzed term from "hero"
@@ -150,17 +156,18 @@ curl "https://data.spuree.com/api/v1/search?q=hero&type=file&cursor=<token>" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 ```
 
-Newly issued HMAC-signed `v1` cursors also bind the caller's current permission
-scope. Treat a cursor as opaque; do not edit or reuse it with a different query,
+Newly issued HMAC-signed `v1` cursors (result page, not a PDF page) also bind
+the caller's current permission scope. Treat a cursor as opaque; do not edit or
+reuse it with a different query,
 source type, filter set, or caller. A malformed, tampered, or mismatched bound
 cursor returns 422. If a previously valid cursor returns 422 after the caller's
-permission scope changes, discard it and restart from the first result page with the same
+permission scope changes, discard it and restart from page one with the same
 query and filters; do not retry the rejected cursor.
 
 Unsigned pre-v1 cursors are no longer accepted. Their migration window closed at
 **2026-09-07 00:00 UTC**; every unsigned cursor now returns 422, and only a valid
 signed `v1` envelope is accepted. Discard an unsigned cursor and restart from
-the first result page with the same query and filters.
+page one with the same query and filters.
 
 **Status Codes:**
 
