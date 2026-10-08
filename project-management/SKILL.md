@@ -1,6 +1,6 @@
 ---
 name: project-management
-description: Create, list, update, delete, and share projects in Spuree, including browsing project contents
+description: Create, list, update, delete, and share projects in Spuree — including giving collaborators a role (viewer, commenter, editor, admin), changing or removing it — and browsing project contents
 ---
 
 # Project Management
@@ -12,7 +12,8 @@ Spuree is an agent-friendly cloud storage. Projects contain folders (nestable) a
 Use this skill when an agent needs to:
 
 - List, create, update, or delete projects
-- Share or unshare projects with other users
+- Share a project with another user at a role (viewer, commenter, editor, admin)
+- Change a collaborator's role, or remove them from the project
 - Browse a project's immediate contents (folders, entities, files)
 
 For managing invitations to non-workspace members, see the **project-invitation** skill.
@@ -69,7 +70,7 @@ Results are always sorted by **project name** (case-insensitive); `sortOrder` on
     {
       "id": "...", "name": "My Project", "description": "...",
       "workspaceId": "...", "createdBy": "user@example.com",
-      "sharedWith": ["collaborator@example.com"],
+      "myPermission": "owner",
       "status": "active", "visibility": "private",
       "createdAt": "...", "updatedAt": "..."
     }
@@ -100,7 +101,9 @@ Create a new project. Name must be Windows filesystem-compatible.
 | `name` | string | Yes | Project name |
 | `workspaceId` | string | Yes | Workspace ObjectId |
 | `description` | string | No | Project description |
-| `sharedWith` | string[] | No | Emails to share with |
+| `tags` | string[] | No | Tags |
+
+To give someone access to the new project, call `POST /v1/projects/{projectId}/share` afterwards.
 
 **Response (201):** `{ messageCode, message, projectId }`
 
@@ -209,9 +212,24 @@ curl "https://data.spuree.com/api/v1/projects/{projectId}/children" \
 
 ---
 
+### Project roles
+
+A collaborator holds one role on a project. Who may grant or change which role:
+
+| Role | What it allows | Who may grant it |
+| --- | --- | --- |
+| `viewer` | Read files and folders | Owner or admin |
+| `commenter` | Read, plus comment on files | Owner or admin |
+| `editor` | Read, write, create and delete content | **Owner only** |
+| `admin` | Editor, plus share the project and manage collaborators below admin | **Owner only** |
+
+The owner is the project's creator; their role is never changed through these endpoints. An admin may change or remove viewers, commenters and editors, but not another admin. Granting `editor` or `admin` is owner-only because those roles spend the owner's credits.
+
+---
+
 ### POST /v1/projects/{projectId}/share
 
-Share a project with another user. Behaves differently based on target's workspace membership:
+Share a project with another user at a role. Behaves differently based on target's workspace membership:
 
 - **Direct** (target is workspace member) → immediately added. Response: `type: "direct"`
 - **Invitation** (target is NOT a member) → pending invitation created (7-day expiry). Response: `type: "invitation"`. See **project-invitation** skill.
@@ -219,6 +237,7 @@ Share a project with another user. Behaves differently based on target's workspa
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `email` | string | Yes | Target user's email |
+| `permission` | string | No | `viewer` (default), `commenter`, `editor`, or `admin`. See **Project roles** for who may grant which. |
 
 **Response:** `{ messageCode, message, projectId, type }`
 
@@ -226,22 +245,56 @@ Share a project with another user. Behaves differently based on target's workspa
 | --- | --- |
 | 200 | Shared or invitation created |
 | 400 | Cannot share with owner |
-| 409 | Already shared or invitation pending |
+| 403 | Caller is not the owner or an admin, or an admin asked for `editor` / `admin` |
+| 409 | Already shared or invitation pending — use `PATCH …/share/{email}` to change an existing collaborator's role |
 
 ```bash
 curl -X POST "https://data.spuree.com/api/v1/projects/{projectId}/share" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"email": "collaborator@example.com"}'
+  -d '{"email": "collaborator@example.com", "permission": "editor"}'
+```
+
+---
+
+### PATCH /v1/projects/{projectId}/share/{email}
+
+Change an existing collaborator's role. **Owner, or an admin changing someone below admin.** The owner's role cannot be changed.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `permission` | string | Yes | New role: `viewer`, `commenter`, `editor`, or `admin`. Granting `editor` or `admin` is owner-only. |
+
+**Response:** `{ messageCode, message, projectId }`
+
+| Code | Description |
+| --- | --- |
+| 200 | Role updated (asking for the role they already hold is also 200) |
+| 400 | Target is the project owner |
+| 403 | Caller may not change this collaborator, or may not grant this role |
+| 404 | Target is not shared on this project |
+
+```bash
+curl -X PATCH "https://data.spuree.com/api/v1/projects/{projectId}/share/collaborator@example.com" \
+  -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"permission": "viewer"}'
 ```
 
 ---
 
 ### DELETE /v1/projects/{projectId}/share/{email}
 
-Remove a user from a shared project. **Owner only.**
+Remove a collaborator from a project. **Owner, or an admin removing someone below admin.** The owner cannot be removed.
 
 **Response:** `{ messageCode, message, projectId }`
+
+| Code | Description |
+| --- | --- |
+| 200 | Collaborator removed |
+| 400 | Target is the project owner |
+| 403 | Caller may not remove this collaborator |
+| 404 | Target is not shared on this project |
 
 ```bash
 curl -X DELETE "https://data.spuree.com/api/v1/projects/{projectId}/share/{email}" \
@@ -252,9 +305,19 @@ curl -X DELETE "https://data.spuree.com/api/v1/projects/{projectId}/share/{email
 
 ### GET /v1/projects/{projectId}/share
 
-List the project's sharing info. **Owner or shared user.**
+List the project's owner and each collaborator with their role. **Owner or shared user.**
 
-**Response:** `{ owner: "owner@example.com", sharedWith: ["..."] }`
+**Response:**
+
+```json
+{
+  "owner": "owner@example.com",
+  "sharedWith": [
+    { "email": "collaborator@example.com", "permission": "editor" },
+    { "email": "reviewer@example.com", "permission": "viewer" }
+  ]
+}
+```
 
 ```bash
 curl "https://data.spuree.com/api/v1/projects/{projectId}/share" \
