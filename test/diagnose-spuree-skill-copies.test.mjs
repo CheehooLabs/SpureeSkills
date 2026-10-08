@@ -17,7 +17,7 @@ async function writeSkill(root, skill, content) {
   return skillPath;
 }
 
-test("covers all seven public Spuree skills", () => {
+test("covers all eight public Spuree skills", () => {
   assert.deepEqual(TARGET_SKILLS, [
     "authentication",
     "file-comment",
@@ -26,6 +26,7 @@ test("covers all seven public Spuree skills", () => {
     "getting-started",
     "project-invitation",
     "project-management",
+    "workspace-management",
   ]);
 });
 

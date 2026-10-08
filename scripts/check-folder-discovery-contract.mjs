@@ -15,6 +15,7 @@ export const SKILL_FILES = Object.freeze({
   gettingStarted: "getting-started/SKILL.md",
   projectInvitation: "project-invitation/SKILL.md",
   project: "project-management/SKILL.md",
+  workspace: "workspace-management/SKILL.md",
 });
 
 const CONTRACT_SKILLS = Object.freeze([

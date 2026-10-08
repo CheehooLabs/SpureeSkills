@@ -17,6 +17,7 @@ export const TARGET_SKILLS = Object.freeze([
   "getting-started",
   "project-invitation",
   "project-management",
+  "workspace-management",
 ]);
 
 async function isDirectory(candidate) {
