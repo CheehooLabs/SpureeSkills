@@ -17,11 +17,12 @@ async function writeSkill(root, skill, content) {
   return skillPath;
 }
 
-test("covers all seven public Spuree skills", () => {
+test("covers every public Spuree skill", () => {
   assert.deepEqual(TARGET_SKILLS, [
     "authentication",
     "file-comment",
     "file-management",
+    "first-post",
     "folder-management",
     "getting-started",
     "project-invitation",

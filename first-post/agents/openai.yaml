@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spuree First Post"
+  short_description: "Set up your brand and make your first post with your own agent"
+  default_prompt: "Use $first-post to set up my brand and make my first post"
