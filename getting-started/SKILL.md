@@ -62,8 +62,10 @@ walking an entire folder tree.
 - “Share or unshare a project.”
 - “Show, accept, decline, cancel, or resend a project invitation.”
 
-The public Spuree skills cover cloud storage and collaboration. Do not advertise
-internal creator capabilities such as motion or video generation.
+The public Spuree skills cover cloud storage and collaboration, plus the
+**first-post** playbook over the MCP connector — a brand memory build and one
+short generated video, both paid and each confirmed by the person first. Do not
+advertise other internal creator capabilities such as motion generation.
 
 ## Guided walkthrough
 

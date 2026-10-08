@@ -34,6 +34,7 @@ Connect Claude Code, Claude Code Web & Cowork, ChatGPT, Codex, or OpenClaw — v
 | Skill | Description |
 | --- | --- |
 | [Getting Started](./getting-started/SKILL.md) | Learn what Spuree can do and complete a safe guided first run |
+| [First Post](./first-post/SKILL.md) | Take a new workspace from nothing to a reviewable post draft with your own agent over the MCP connector — a business, a product or a personal brand; your own material or a brief you approve, a quote before the first paid step, one confirmed brand memory build, a reel studied for pacing, a short vertical video, the draft under the brand |
 | [Authentication](./authentication/SKILL.md) | Obtain JWT tokens, manage API keys |
 | [Project Management](./project-management/SKILL.md) | Create, list, update, delete, and share projects; browse contents |
 | [Folder Management](./folder-management/SKILL.md) | Find canonical folders in one bounded call, list recent folders, and create, update, delete, browse, or download folder content |
@@ -83,7 +84,7 @@ node scripts/diagnose-spuree-skill-copies.mjs --target /path/to/project --json
 
 When the checkout and target project differ, the checkout remains the immutable
 source reference while `--target` controls project/workspace discovery. The
-diagnostic scans all eight public skills across `.agents`, `.codex`, `.claude`,
+diagnostic scans every public skill across `.agents`, `.codex`, `.claude`,
 OpenClaw workspace/global, Hermes global, and Codex plugin-cache roots. It
 reports paths, SHA-256 hashes, catalog scan order, exposed names, and plugin
 namespace/version metadata. Collision groups use the exposed skill name, so a

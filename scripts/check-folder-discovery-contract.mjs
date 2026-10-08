@@ -11,6 +11,7 @@ export const SKILL_FILES = Object.freeze({
   authentication: "authentication/SKILL.md",
   file: "file-management/SKILL.md",
   fileComment: "file-comment/SKILL.md",
+  firstPost: "first-post/SKILL.md",
   folder: "folder-management/SKILL.md",
   gettingStarted: "getting-started/SKILL.md",
   projectInvitation: "project-invitation/SKILL.md",
