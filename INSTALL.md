@@ -150,11 +150,11 @@ When you connect, studio.spuree.com shows a consent screen — **Authorize** plu
 Two things worth knowing before you click Allow:
 
 - **`write` includes permanent deletion** and removing teammates from workspaces. That wording is deliberate.
-- **`render` currently enables nothing in connectors** — it covers REST endpoints only, and no render tools are exposed on the MCP surface yet.
+- **`render` is the paid-work scope** — on the connector it lets your agent start a brand memory build and generate a video, the two steps the **first-post** skill prices and confirms with you before spending credits; without it those tools answer `insufficient_scope`.
 
 ### What tools appear
 
-On Claude surfaces, the connector exposes tools grouped by scope — for example `project_list`, `project_browse`, `folder_browse`, `file_search`, `file_read_content`, and `comment_list` (read); `project_create`, `folder_create`, `file_update`, `file_create` (Markdown file creation), and `comment_create` (write); `project_share` and the `invite_*` tools (invite). Plus `getting_started`, a read-only orientation guide, and `destination_suggest`, which ranks likely save destinations. Many responses include `webUrl` links straight into the Spuree web app.
+On Claude surfaces, the connector exposes tools grouped by scope — for example `project_list`, `project_browse`, `folder_browse`, `file_search`, `file_read_content`, and `comment_list` (read); `project_create`, `folder_create`, `file_update`, `file_create` (Markdown file creation), and `comment_create` (write); `project_share` and the `invite_*` tools (invite); and, with `write` and `render` approved, the brand, post and video tools the **first-post** skill drives (`brand_create`, `brand_build_start`, `video_generate`, `post_draft_create` and their companions). Plus `getting_started`, a read-only orientation guide, and `destination_suggest`, which ranks likely save destinations. Many responses include `webUrl` links straight into the Spuree web app.
 
 The exact tool list depends on your client and may grow as new skills ship — ChatGPT sees only `search`, `fetch`, and `getting_started`.
 
