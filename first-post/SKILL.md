@@ -132,10 +132,12 @@ not given.
    personal brand their own photos are owned material. Then the video: a reel
    they like — a link or a local file — teaches structure only and stays
    inspiration (Phase 6); a clip of their own can be the post itself or the
-   material for a new video (Phase 6b). Ask which it is when they hand you one.
-   In a cloud sandbox (**Where you are running**), ask for the reel as a file
-   attached to the chat, in this same message: a link cannot be downloaded from
-   there.
+   material for a new video (Phase 6b). When they hand you their own clip, ask
+   in this same message — "Is it the finished post, or material for a new
+   video?" — and record the answer: it decides what the quote covers (Phase 4)
+   and whether a video is generated at all (Phase 7). In a cloud sandbox
+   (**Where you are running**), ask for the reel as a file attached to the
+   chat, in this same message: a link cannot be downloaded from there.
 
 Do not ask for anything you can read from the tools or that the onboarding prompt
 already carried (it usually names the `workspaceId` and `site`).
@@ -348,7 +350,15 @@ will cost — once, before the first paid step.
    lower-resolution video, never a change to the brand content — and quote again
    with it. If nothing fits, stop before the build: do not start a build that
    cannot finish.
-3. If `video_quote` is not in your tool list even after a reconnect, say the
+3. **When their own clip is the post** (the Phase 0 answer), the fit check is
+   the brand build alone. Call `video_quote` with `brandId` exactly as in step
+   1, read only the build's line of `workflow.steps`, and say that the video
+   line does not apply — no video is generated. `workflow.fits` and
+   `workflow.totalCredits` include that video, so do not stop on them: the
+   person needs the build's credits, which you read against
+   `balance.availableCredits`. Proceed on a yes to the build; Phase 7's quote
+   and approval are skipped, and Phase 8 attaches the clip.
+4. If `video_quote` is not in your tool list even after a reconnect, say the
    build is **about 136 credits** and call it what it is — an estimate, not a
    quote — and that the video is priced when its tool answers. Never add figures
    up yourself.
@@ -435,7 +445,8 @@ is Phase 6b; it may also be read the way a reel is.
 ## Phase 6b — Their own clip
 
 A clip the person made themselves is their content: it may be the post, the
-material for a new video, or a structure reference. Ask once which it is.
+material for a new video, or a structure reference. Phase 0 recorded which it
+is; follow that answer and do not ask again.
 
 1. **It is the post.** Upload it to the campaign project as a plain file —
    `file_upload_start` with `sessionId` = the project, no `kbMaterial`, the
@@ -459,6 +470,9 @@ material for a new video, or a structure reference. Ask once which it is.
    also go in as `@video1`.
 
 ## Phase 7 — The video
+
+Skip this phase when the person's own clip is the post (Phase 0, Phase 6b): no
+quote, no approval, no job — Phase 8 attaches the clip.
 
 1. Write a text-to-video prompt that **mirrors the pattern with the brand's own
    content**: the same beat lengths and camera behaviour, the brand's product,
@@ -540,6 +554,7 @@ number you added up yourself.
 | `upstream_unavailable` on a paid start | Read your saved state, then the status, before anything else; retry only with the same `idempotencyKey` and body. |
 | Reel will not download | Ask for the file, or for one of their own posts. Never bypass a login wall. |
 | `video_pattern_read` answers `analysing` for more than about two minutes, or `failed` | Fall back to the local read (Phase 6, steps 2–5) if you can run `ffmpeg`; in a cloud sandbox, say so once and write the pattern from the person's description of the reel. |
+| `first_post_state` says `approve_video` but the person's clip is the post | Do not quote or generate. Upload the clip to the campaign project if it is not there yet, then `post_video_attach` it; the server then recognises the attached clip and moves on. |
 | Video `failed` with `REFERENCE_VIDEO_PRIVACY` | The reference clip shows a real person; nothing was charged. Offer to attach the clip to the post as it is (Phase 6b, step 1) or to use it as structure only; a new prompt is a new paid job with a new quote, a new yes and a new key. |
 | A PUT to the upload URL fails with a proxy 403/407, "CONNECT tunnel failed" or a refused connection to the storage host | A network policy, not a glitch — usually a cloud sandbox. Do not retry it by any other route. Follow **When an upload is blocked** (Phase 3): record it through `first_post_state` if it takes `uploadBlocked`, send small files and the brief inline if those tools exist, otherwise one message with the three options. Progress is saved; nothing is created twice. |
 | A path exists (listing, `stat`) but reading it fails with "Operation not permitted" / "Permission denied" | Say so once, keep the intake, offer the accessible-folder copy or the web upload (**Local files**). Do not retry the same path; do not change OS permissions. |
