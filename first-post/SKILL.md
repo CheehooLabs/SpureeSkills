@@ -13,30 +13,46 @@ time, and never spend credits without an explicit yes.
 ## What this needs
 
 This playbook runs over the **MCP connector** (Claude Code, Codex or Cowork
-connected to `/mcp`): it uses `brand_lookup`, `brand_create`,
-`file_upload_start` / `file_upload_complete`, `brand_build_start`,
-`brand_build_status`, `brand_pending_read` / `brand_pending_commit`,
-`video_generate` / `video_get_status` / `video_get_result`,
-`post_draft_create`, `post_get`, `post_video_attach`, `file_search`, and
-`project_list` / `project_create`. If `brand_create` is not among your tools,
-say so and send the person to the **Connect your AI tools** guide in Studio to add
-the connector — the brand and post routes do not accept an API key.
+connected to `/mcp`): it uses `first_post_state`, `first_post_approve`,
+`brand_lookup`, `brand_create`, `file_upload_start` / `file_upload_complete`,
+`brand_build_start`, `brand_build_status`, `brand_pending_read` /
+`brand_pending_commit`, `video_quote`, `video_generate` / `video_get_status` /
+`video_get_result`, `post_draft_create`, `post_get`, `post_video_attach`,
+`file_search`, and `project_list` / `project_create`. If `brand_create` is not
+among your tools, say so and send the person to the **Connect your AI tools**
+guide in Studio to add the connector — the brand and post routes do not accept an
+API key.
 
-Three more tools may appear in your tool list; this playbook names them by purpose
-and never guesses their shape: **the quote tool** prices the remaining
-workflow, **the capabilities/preset answer** says which video settings
-are supported, and **the persisted first-post state** keeps your
-progress across sessions. Use each when it is in your tool list; the fallback for
-each is written where it is used.
+Three of those carry the money and the memory:
+
+- **`first_post_state`** opens and reads the person's journey — every id that
+  already exists, a live read of the build, job, post and balance, the budget,
+  and `next`: the one step to take now. Your tool calls are recorded into the
+  journey only after it is open, so call it **first**.
+- **`video_quote`** prices a video without spending anything, with the same
+  arguments as `video_generate`. With `brandId` it also prices the rest of the
+  first post (the brand build if it is still owed, the video, the draft at 0)
+  against the real balance; with `includeCatalog: true` it lists the supported
+  models, resolutions, durations and ratios and the model a request naming none
+  runs. A valid quote carries the `approval` you pass back to `video_generate`.
+- **`first_post_approve`** records the person's yes to ONE paid step, after they
+  said it and before the paid call. One approval covers exactly one build start
+  or one video key; any attempt consumes it.
+
+A connector added before these tools shipped can show a cached tool list without
+them: ask the person to reconnect once. The fallback for each, if they still do
+not appear, is written where it is used.
 
 Scopes: the person must have approved `read`, `write` and `render` at consent.
 `render` is what lets you start the paid steps — the brand build and the video.
 If a tool answers `insufficient_scope`, tell them which scope is missing and how
 to reconnect.
 
-Start every session by reading your saved state back (**What you save**, below)
-and resuming where it says you are. Never restart the intake because a session
-ended.
+Start every session with `first_post_state` (or your saved file, **What you
+save**, below) and resume where it says you are: follow `next.action` and its
+`reason`, reuse every id it names, and never create a second campaign, brand,
+build or post. When `next.requiresFreshApproval` is true, ask the person again
+before any paid call. Never restart the intake because a session ended.
 
 You also need to be able to **read local files and make HTTP requests**: the
 person's brand material and the reference reel are uploaded from their machine by
@@ -46,16 +62,21 @@ plan around a path.
 
 ## What you save
 
-Before each paid call, and whenever an id arrives, write
+With `first_post_state` in your tool list, the server keeps the record: once the
+journey is open, each project, brand, upload, build, video and post call that
+succeeds is written into it, and `first_post_approve` writes each yes with its
+quote, settings and `idempotencyKey`. You save nothing by hand; you read it back.
+Without that tool, write
 `{workspaceId, projectId, kbEntityId, buildId, idempotencyKey, jobId, postId, version}`
-— whatever you have so far — to **the persisted first-post state**
-when that tool is in your tool list, otherwise to `first-post-state.json` in the
-folder you are working in. Read it back at the start of every session and after
-any uncertain outcome (a timeout, `upstream_unavailable`, a dropped connection)
-before deciding what to do next: a saved `buildId` means poll, not start; a saved
-`idempotencyKey` means retry with the same key and body, not a new job; a saved
-`kbEntityId` means reuse, not create. The person never repeats an answer because
-your session ended.
+— whatever you have so far — to `first-post-state.json` in the folder you are
+working in, before each paid call and whenever an id arrives.
+
+Read the state back at the start of every session and after any uncertain
+outcome (a timeout, `upstream_unavailable`, a dropped connection, a 409) before
+deciding what to do next: a saved `buildId` means poll, not start; a saved
+`idempotencyKey` means replay the same key and body only to learn the outcome,
+never to generate again; a saved `kbEntityId` means reuse, not create. The
+person never repeats an answer because your session ended.
 
 ## Phase 0 — Who and what
 
@@ -73,10 +94,12 @@ not given.
    and ends the website questions.
 3. **Audience and voice.** Who it is for; three words for how it should sound;
    anything to avoid.
-4. **Platform.** Instagram, vertical `9:16`, as a proposed default. Everything
-   else about the video — duration, model — comes from the capabilities/preset
-   answer when that tool is in your tool list; name no model or
-   resolution yourself.
+4. **Platform.** Instagram, vertical `9:16`, as a proposed default. The first-post
+   video preset is `9:16`, `720p`, 15 seconds and no model (the server's
+   default), which fits the starter allowance together with the build;
+   `video_quote` confirms it. Name no other model or resolution yourself — a
+   different one comes only from the quote's `alternatives`, picked by the
+   person.
 5. **Materials, and a reel they like.** "Do you have files of your own — photos,
    past posts, a bio, a CV, product sheets, guidelines? If not, I'll write a
    one-page brand brief from your answers for you to approve." Only their own
@@ -241,27 +264,36 @@ runs, and a rebuild costs full price again.
 Nothing paid has happened yet. This is where the person learns what the rest
 will cost — once, before the first paid step.
 
-1. With the material in place, call **the quote tool** for the
-   remaining workflow — one brand build and one video, with any preset from the
-   capabilities/preset answer — and show the quote against the
-   person's credit allowance, in their words.
-2. Proceed only on an explicit yes to that quote. A shortfall ends it
-   here: say what is short and stop; do not start a build that cannot
-   finish.
-3. Until the quote tool is in your tool list, say the build is **about 136
-   credits** and call it what it is — an estimate, not a quote — and that the
-   video is priced when its tool answers. The quote tool's number wins the moment
-   it is available; never add the two up yourself.
+1. With the material in place, call `video_quote` with `brandId` = the brand's
+   `kbEntityId`, `folderId` = the campaign project, the planned video at the
+   preset (`ratio: "9:16"`, `resolution: "720p"`, `duration: 15`, no model) and a
+   one-line prompt for it. Show the person `workflow.steps` (the brand build —
+   an estimate until it runs —, the video, the draft at 0),
+   `workflow.totalCredits`, `balance.availableCredits` and
+   `workflow.expectedRemainingCredits`, in their words.
+2. Proceed only on an explicit yes to that quote. If `workflow.fits` is false,
+   say the gap first (`workflow.totalCredits` minus `workflow.availableCredits`),
+   then offer `recommended` or another entry of `alternatives` — a shorter or
+   lower-resolution video, never a change to the brand content — and quote again
+   with it. If nothing fits, stop before the build: do not start a build that
+   cannot finish.
+3. If `video_quote` is not in your tool list even after a reconnect, say the
+   build is **about 136 credits** and call it what it is — an estimate, not a
+   quote — and that the video is priced when its tool answers. Never add figures
+   up yourself.
 
 ## Phase 5 — One build, confirmed
 
-1. Name the step and its cost — the build's line from the quote, or the Phase 4
-   estimate while there is no quote tool — say that a first build goes live by
+1. Name the step and its cost — the build's line from `video_quote`, or the
+   Phase 4 estimate when that tool is unavailable — say that a first build goes live by
    itself when it completes, and ask for an explicit yes. Do not proceed on
    silence, or on an earlier yes to something else (the yes to the quote is not
    the yes to the build).
-2. Save the request (**What you save**), then `brand_build_start` with the
-   `kbEntityId`; record the `buildId` as soon as it answers. 402 is a shortfall:
+2. After the yes, call `first_post_approve` with `step: "brand_build"`, the
+   `kbEntityId`, and the quote: the build's credits from `video_quote`'s
+   `workflow.steps` with `source: "quote"` (or the Phase 4 estimate with
+   `source: "stated"`). Then ONE `brand_build_start` with the `kbEntityId`;
+   record the `buildId` as soon as it answers. 402 is a shortfall:
    say what is short and stop. 409
    `brand_memory_build_in_progress` means one is already running: poll that
    instead of starting another.
@@ -309,23 +341,31 @@ content. Nothing from it is copied, quoted or shown.
    the models render it as gibberish; captions belong in the post. For a
    personal brand the prompt describes setting, action and tone — never the
    person's face or body — and no photo of them goes in as a reference.
-2. **Settings come from the capabilities/preset answer** when that
-   tool is in your tool list: ratio, duration and model exactly as it reports
-   them, with the duration as close to the reel's length as the supported range
-   allows. Without it, keep ratio `9:16`, set the duration to the reel's length
-   within what `video_generate`'s own description allows, and leave model and
-   resolution unset. Never guess a model name or a resolution.
-3. Show the person the prompt, the duration and the video's line from the quote
-   (or say that it is priced when the tool answers), and ask for a yes.
-4. Generate a unique `idempotencyKey` for THIS generation and save it with the
-   full request (**What you save**) **before** calling `video_generate` with the
-   prompt, the project as `folderId`, the ratio and the duration; record the
-   `jobId` as soon as it answers. A new key means a new paid job. After an
-   uncertain outcome, retry only with the same key and body — never with a new
-   key, and never without being asked.
-5. Poll `video_get_status` every 10–20 seconds. `failed` is terminal — report it
-   and ask before trying a different prompt; a different prompt is a new paid
-   job with a new key and its own yes.
+2. **Settings are the preset** — `9:16`, `720p`, 15 seconds, no model — or the
+   alternative the person picked from a quote. A reel shorter than 15 seconds
+   may set a shorter duration (never below 4). Never guess a model name or a
+   resolution.
+3. Call `video_quote` again with the final prompt and those settings — the build
+   has changed the balance. Show the person the prompt, `price.credits` and what
+   will be left, and ask for a yes. An `invalid` verdict names the problem and
+   priced `alternatives`; an `unaffordable` one names the shortfall: offer
+   `recommended` before any top-up, and quote the one they pick.
+4. After the yes, generate a unique `idempotencyKey` for THIS generation and call
+   `first_post_approve` with `step: "video"`, the exact `video_generate`
+   arguments you will send (minus the key) as `settings`, that
+   `idempotencyKey`, the quote (`credits` = `price.credits`, `source: "quote"`)
+   and the brief. Then call `video_generate` with that same key and those same
+   arguments, the project as `folderId`, and the quote's `approval`
+   (`approvedCredits` and `approvedPricingVersion`); record the `jobId` as soon
+   as it answers. Without `first_post_state`, save the key and the full request
+   to your file first. A new key means a new paid job. After an uncertain
+   outcome, replay only the same key and body to learn what happened — never a
+   new key, and never without being asked.
+5. Poll `video_get_status` every 10–20 seconds. Its `billing` says what the job
+   charged, refunded or still holds. `failed` is terminal — report it and its
+   `billing` (a refused job has `chargedCredits: 0`), and ask before trying a
+   different prompt; a different prompt is a new paid job with a new quote, a
+   new yes and a new key.
 6. `video_get_result` returns the `fileId` and a preview link. Share the link and
    ask whether to use it or try once more.
 
@@ -347,8 +387,9 @@ what the models can and cannot do); use its patterns, not its endpoint details.
    or publish from here.
 
 Say what happened in one short list: the brand (link), the material count, the
-video (preview link), the draft (link), and the credits spent — as **the billing
-outcome** reports them, never a number you added up yourself.
+video (preview link), the draft (link), and the credits spent — as
+`first_post_state`'s `budget.spent` and the job's `billing` report them, never a
+number you added up yourself.
 
 ## When something goes wrong
 
@@ -359,8 +400,11 @@ outcome** reports them, never a number you added up yourself.
 | 409 `brand_exists` | Use the `kbEntityId` in `details`; do not create another brand. |
 | Two or more brands with the person's name (no website) | List name · id · link and let the person pick, or say "new". Never pick silently. |
 | `brand_create` may or may not have happened | `file_search` by name in the workspace before creating again; never create twice in one session. |
-| 402 on a paid start | A shortfall: say what is short and stop. The amount comes from the quote or from the 402's own answer, not from the estimate in this file. |
-| The quote tool, the capabilities answer or the state tool is not in your tool list | Say so once and use the fallback written in its phase: the Phase 4 estimate, the video tool's own documented bounds, `first-post-state.json`. Never guess a price, a model or a resolution. |
+| 402 on a paid start | A shortfall; nothing was charged. Say the numbers it carries (`requiredCredits`, `spendableCredits`, `shortfallCredits`), offer its cheaper `quote.recommended` or `alternatives` before a top-up, and quote the one the person picks; a new submission needs their yes and a NEW `idempotencyKey`. The `billingWebUrl` is where a workspace owner adds credits. |
+| 400 `INVALID_ADVANCED_OPTIONS` on `video_generate` | The settings are not supported; nothing was charged. Offer the priced alternatives it carries, quote the one the person picks, and submit it with their yes and a NEW key. |
+| 409 `QUOTE_STALE` on `video_generate` | The price or pricing version moved since the quote; nothing was charged. Quote again, ask again, and submit with a NEW key and the new `approval`. |
+| 409 on `first_post_approve` | That key is already approved with other settings or already attempted. Do not reuse it; ask for a fresh yes and use a new key. |
+| `first_post_state`, `video_quote` or `first_post_approve` is not in your tool list | Ask the person to reconnect once (a cached tool list lags a deploy). If they still do not appear, say so once and use the fallback written in its phase: `first-post-state.json`, the Phase 4 estimate, the preset. Never guess a price, a model or a resolution. |
 | A session ended mid-flow | Read your saved state first and resume at the phase it shows. Never re-run the intake. |
 | 409 `brand_memory_build_in_progress` | Poll `brand_build_status`; never start a second build. |
 | Build `failed` | Report its `error` sentence. Do not rebuild on your own. |
@@ -382,8 +426,8 @@ outcome** reports them, never a number you added up yourself.
   own; nothing paid is retried automatically.
 - **Save before you spend.** Request, idempotency key and job ids are written down
   before each paid call and read back after any doubt.
-- **Supported settings only.** Ratio, duration and model come from the
-  capabilities answer or the tool's own description, never from a guess.
+- **Supported settings only.** The preset, or an alternative `video_quote`
+  offered and the person picked; never a guessed model or resolution.
 - **Preserve, then propose.** Every answer the person gives survives; defaults are
   labelled as proposed; nothing is asked twice.
 - **Facts from the person and the brand memory.** No invented claims, credentials,
@@ -391,4 +435,4 @@ outcome** reports them, never a number you added up yourself.
   shows setting, action and tone, never the person's face.
 - **The links are the finish.** The video preview and the draft's `webUrl` end
   the job; approval and publishing happen in Studio, and the credits spent are
-  what the billing outcome says.
+  what `first_post_state`'s budget and the job's `billing` say.
