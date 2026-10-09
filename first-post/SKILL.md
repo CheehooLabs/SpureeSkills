@@ -18,7 +18,9 @@ connected to `/mcp`): it uses `first_post_state`, `first_post_approve`,
 `brand_build_start`, `brand_build_status`, `brand_pending_read` /
 `brand_pending_commit`, `video_quote`, `video_generate` / `video_get_status` /
 `video_get_result`, `post_draft_create`, `post_get`, `post_video_attach`,
-`file_search`, and `project_list` / `project_create`. If `brand_create` is not
+`file_search`, and `project_list` / `project_create` — plus, where your tool
+list has them, `file_upload_inline` and `file_create` for uploads from a cloud
+sandbox (**When an upload is blocked**). If `brand_create` is not
 among your tools, say so and send the person to the **Connect your AI tools**
 guide in Studio to add the connector — the brand and post routes do not accept an
 API key.
@@ -59,6 +61,26 @@ person's brand material and the reference reel are uploaded from their machine b
 PUTting bytes to a presigned URL. Being able to list a file is not the same as
 being able to read it — check the bytes first (**Local files**, below) before you
 plan around a path.
+
+## Where you are running
+
+Right after `first_post_state`, work out where your commands run. It decides how
+the material and the reel reach the server, and nothing else.
+
+- **On the person's computer** — a shell or a device bridge on their machine, or
+  the paths they name are readable (**Local files**). Uploads go out over their
+  own network. Continue as written.
+- **In a cloud sandbox** — Claude on the web, or any session whose commands run
+  on a remote machine that cannot see the person's files. Its network usually
+  allows package registries and code hosts, and may refuse the storage host that
+  uploads go to and the site a reel lives on. Everything before the material is
+  MCP-only and works there: run the intake (Phase 0), the project (Phase 1) and
+  the brand (Phase 2) as written. In the Phase 0 message, ask for the reel as a
+  file attached to the chat, not a link. Before Phase 3, tell the person once
+  that uploads from here may be blocked, and that their progress is kept if they
+  are.
+
+Nothing about credits, quotes or approvals changes with where you run.
 
 ## What you save
 
@@ -105,7 +127,9 @@ not given.
    one-page brand brief from your answers for you to approve." Only their own
    content (material rule, Phase 3); for a personal brand their own photos are
    owned material. And, if they have one, a reel they like for pacing — a link
-   or a local file; it stays inspiration (Phase 6).
+   or a local file; it stays inspiration (Phase 6). In a cloud sandbox (**Where
+   you are running**), ask for the reel as a file attached to the chat, in this
+   same message: a link cannot be downloaded from there.
 
 Do not ask for anything you can read from the tools or that the onboarding prompt
 already carried (it usually names the `workspaceId` and `site`).
@@ -223,7 +247,8 @@ the **Local files** check:
    `kbMaterial: true`, the file name without extension, the lowercase extension,
    the exact byte size and, if you can compute it, the CRC32 (base64).
 2. PUT the bytes to the returned `uploadUrl` with exactly the `requiredHeaders`
-   (multipart mode returns one URL per part).
+   (multipart mode returns one URL per part). If the PUT is refused by the
+   network, stop here: **When an upload is blocked**, below.
 3. `file_upload_complete` with the `fileId`.
 
 **Without files.** Write a one-page brief from the confirmed facts and nothing
@@ -246,9 +271,47 @@ Open the file with the line "Written by your agent from your answers on <date>.
 Edit anything; nothing here was scraped." Show the whole brief. The person edits
 it or says "use it"; only then upload it as material — `file_upload_start`
 (`sessionId` = `kbEntityId`, `kbMaterial: true`, `fileName: brand-brief`,
-`fileFormat: md`, the exact byte size) → PUT → `file_upload_complete`. A
-browser-only client cannot upload material; say so plainly and send the person
-to the web app.
+`fileFormat: md`, the exact byte size) → PUT → `file_upload_complete`. The brief
+is text, so when `file_create` takes `kbMaterial` it can go up with no PUT at all
+— `file_create` with `sessionId` = `kbEntityId`, `fileName: brand-brief.md`, the
+brief as `content` and `kbMaterial: true`; in a cloud sandbox, use that first.
+
+**When an upload is blocked.** A PUT that fails the way a network policy refuses
+— a proxy 403 or 407, "CONNECT tunnel failed" or a rejected CONNECT, a refused
+connection to the storage host — fails the same way every time. On the first
+one:
+
+1. **Stop.** Do not retry it with another command, another host, another tool,
+   or a proxy setting.
+2. **Record it.** If `first_post_state` takes `uploadBlocked`, call it once with
+   the storage `host` and the `error` line, so the person's onboarding page shows
+   why the journey is waiting.
+3. **Send what can still go.** If `file_upload_inline` is in your tool list, it
+   carries the bytes inside the tool call, so it is for small files only — up to
+   64 KB. Shrink a photo first (a JPEG about 640 px on its long side), upload that
+   copy with the brand's `kbEntityId` and `kbMaterial: true`, and say you sent a
+   smaller copy. Text material goes through `file_create` as above. If every
+   file went up this way, continue with Phase 4. If any could not — too big, or
+   not a photo you can shrink — go to step 4 and name those files: the build
+   reads only what is there, and a rebuild costs full price again.
+4. **Otherwise, tell the person once**, in plain words, with exactly these
+   options — and nothing else to try:
+
+   > I couldn't upload your files from here: this chat runs in a cloud sandbox
+   > whose network blocks the storage service. Your progress is saved — the
+   > project and the brand stay as they are, nothing will be created twice, and
+   > no credits have been spent. You can:
+   >
+   > a) open this chat in the Claude desktop app on the computer that has the
+   >    files, then send me a message;
+   > b) drag the files onto your brand page — `<brand webUrl>` — and tell me when
+   >    they're there;
+   > c) ask an admin of your Claude organization to allow `<host>` in Claude's
+   >    network settings.
+
+5. **When they come back**, call `first_post_state` and follow `next`: it resumes
+   the same project and brand. Never create either again, and never re-run the
+   intake.
 
 **Material rule.** Material becomes the brand's memory. Upload only what belongs
 to the person: their guidelines, product sheets, photos, their own posts, the
@@ -317,7 +380,10 @@ happened, read your saved state and then the build status before anything else.
 The reel teaches **structure** — hook, beats, pacing, camera behaviour — never
 content. Nothing from it is copied, quoted or shown.
 
-1. **Get the file locally.** For a link, try `yt-dlp -o reference.mp4 "<url>"`
+1. **Get the file locally.** In a cloud sandbox (**Where you are running**), do
+   not try `yt-dlp` — the reel's site is usually blocked there too: use the file
+   the person attached in Phase 0, or ask for it now. Otherwise, for a link, try
+   `yt-dlp -o reference.mp4 "<url>"`
    if `yt-dlp` is installed; Instagram often refuses anonymous downloads, so if
    that fails, ask the person to save the video and give you the path, or to pick
    one of their own posts instead (their own content is the most reliable
@@ -410,6 +476,7 @@ number you added up yourself.
 | Build `failed` | Report its `error` sentence. Do not rebuild on your own. |
 | `upstream_unavailable` on a paid start | Read your saved state, then the status, before anything else; retry only with the same `idempotencyKey` and body. |
 | Reel will not download | Ask for the file, or for one of their own posts. Never bypass a login wall. |
+| A PUT to the upload URL fails with a proxy 403/407, "CONNECT tunnel failed" or a refused connection to the storage host | A network policy, not a glitch — usually a cloud sandbox. Do not retry it by any other route. Follow **When an upload is blocked** (Phase 3): record it through `first_post_state` if it takes `uploadBlocked`, send small files and the brief inline if those tools exist, otherwise one message with the three options. Progress is saved; nothing is created twice. |
 | A path exists (listing, `stat`) but reading it fails with "Operation not permitted" / "Permission denied" | Say so once, keep the intake, offer the accessible-folder copy or the web upload (**Local files**). Do not retry the same path; do not change OS permissions. |
 | A path does not exist | Show the exact string you tried and ask for the corrected path once; offer an `ls` of a folder you *can* read if that helps. |
 | A file reads as zero bytes or a sync placeholder | Ask the person to open it once so it downloads, or to copy it; do not upload the placeholder. |
