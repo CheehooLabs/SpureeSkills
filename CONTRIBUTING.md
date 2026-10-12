@@ -112,8 +112,25 @@ comment, whether you changed something or not.
 
 ## After your pull request merges
 
-Merging here does not update every copy of these skills. Cheehoo's internal plugin
-and the Spuree Studio MCP server each vendor these files at a pinned commit of this
-repository and re-pin in their own repositories. If your change should reach them,
-leave a comment on the merged pull request with the commit on `main` that contains
-it, so the re-pin uses a commit that stays reachable.
+Merging here does not update every copy of these skills. Three distributions
+vendor these files at a pinned commit of this repository and re-pin in their own
+repositories:
+
+- [InternalSpureeSkills](https://github.com/CheehooLabs/InternalSpureeSkills),
+  Cheehoo's staff plugin
+  (`node scripts/update-public-skills-pin.mjs <sha> --source ../SpureeSkills`).
+- [ContinuitySkills](https://github.com/StageContinuity/ContinuitySkills), the
+  Continuity-branded public copy that Folio's **Connect your AI tools** page links
+  to. Every shared skill there is generated from this repository through a rename
+  map (`node scripts/materialize-spuree-skills.mjs --pin <sha> --source ../SpureeSkills`),
+  so a skill is never edited there by hand. Its generator refuses a re-pin when a
+  brand token survives the rename, so if you spell the brand or a host in a new
+  way here (anything other than `Spuree`, `spuree`, `SPUREE_`, `Spuree Studio`,
+  `Studio`, `studio.spuree.com`, `data.spuree.com`, `spuree.com`), say so under
+  *Downstream impact* so its `distribution/rename-map.json` can learn it.
+- The Spuree Studio MCP server (cheehooStudio
+  `apps/studio/src/app/mcp/vendor/spuree-skills-source/`).
+
+If your change should reach them, leave a comment on the merged pull request with
+the commit on `main` that contains it, so the re-pin uses a commit that stays
+reachable.

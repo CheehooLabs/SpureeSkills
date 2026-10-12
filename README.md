@@ -12,6 +12,11 @@ npx skills add https://github.com/CheehooLabs/SpureeSkills
 
 To update to the latest version, run the same command again.
 
+Using **Continuity**, the new name of Spuree? Install
+[ContinuitySkills](https://github.com/StageContinuity/ContinuitySkills) instead:
+the same skills, generated from this repository with the Continuity hosts and
+names.
+
 ## Getting Started
 
 After installing or connecting Spuree, ask your agent:
