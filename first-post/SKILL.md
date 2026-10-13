@@ -222,10 +222,10 @@ You need a **workspace id** for the brand and a **project** for the video.
 
 **With a website.** `brand_lookup` with the workspace and website first. If it
 exists, reuse its `kbEntityId` and skip to Phase 3 — tell the person their brand
-already exists and open its `webUrl`. Otherwise `brand_create` with the
-workspace, the name, the website and any social links. A 409 `brand_exists`
-carries the holder's `kbEntityId` in `details`: use that brand rather than
-creating another.
+already exists and open its `webUrl`, pasted from the result. Otherwise
+`brand_create` with the workspace, the name, the website and any social links.
+A 409 `brand_exists` carries the holder's `kbEntityId` in `details`: use that
+brand rather than creating another.
 
 **Without a website** (a personal brand, or a business with no site). A brand
 without a website has no identity key, so `brand_lookup` cannot find it and a
@@ -234,10 +234,12 @@ second create is not refused. Search by name instead — `file_search` with
 
 - 0 hits → `brand_create` with the workspace and the name, no website. Always
   pass the name: a personal brand is named by the person, never "Untitled brand".
-- 1 hit whose name matches exactly → "You already have a brand called X (link).
-  Use it?" On yes, reuse its `kbEntityId`.
-- 2 or more hits, or a near match → list name · id · link for each and ask which
-  one, or "new". Never pick silently.
+- 1 hit whose name matches exactly → "You already have a brand called X
+  (`<its webUrl, pasted from the hit>`). Use it?" On yes, reuse its
+  `kbEntityId`.
+- 2 or more hits, or a near match → list name · id · `webUrl` for each (id and
+  `webUrl` pasted from the hit) and ask which one, or "new". Never pick
+  silently.
 
 `brand_create` is the FREE shell; it never builds. Keep the `kbEntityId` and save
 it (**What you save**). The search index trails writes by a few seconds,
@@ -332,6 +334,9 @@ not here, unless they also want it in the brand's memory.
 Upload **everything** before the build. The build reads what is there when it
 runs, and a rebuild costs full price again.
 
+If you mention an uploaded file, give the `webUrl` from its result, pasted as
+is, or point at the brand page (`<brand webUrl>`); never type a file id.
+
 ## Phase 4 — The quote
 
 Nothing paid has happened yet. This is where the person learns what the rest
@@ -381,7 +386,7 @@ will cost — once, before the first paid step.
 3. Poll `brand_build_status` every 5–10 seconds. Report progress in the person's
    words ("reading your website", "writing the brand profile"), not node names.
 4. **A first build publishes live by itself.** When status is `completed`, the
-   brand memory is live; share the brand's `webUrl`.
+   brand memory is live; share the brand's `webUrl`, pasted from the result.
 5. Only a **rebuild** stages a draft. If the build status says a version is
    awaiting confirmation: `brand_pending_read`, show the person what it holds
    (version, article count, the infobox cards), and only after they agree call
@@ -410,9 +415,10 @@ is Phase 6b; it may also be read the way a reel is.
    on-screen text, tone), `analysing` (wait 10 seconds and call again, for up
    to about two minutes), or `failed` (fall back to the local read, steps 2–5).
    In a cloud sandbox (**Where you are running**) this is the path — the reel's
-   site is usually blocked there — so say so once and give the project's web
-   URL for the upload; without the tool, use the file the person attached in
-   Phase 0.
+   site is usually blocked there — so say so once and give the project's
+   `webUrl` for the upload, pasted from `project_create`'s result (or from
+   `project_list` if you no longer have it); without the tool, use the file
+   the person attached in Phase 0.
 2. **Otherwise get the file locally.** In a cloud sandbox, do not try `yt-dlp`
    — the reel's site is usually blocked there too: use the file the person
    attached in Phase 0, or ask for it now. Otherwise, for a link, try
@@ -508,8 +514,10 @@ quote, no approval, no job — Phase 8 attaches the clip.
    `billing` (a refused job has `chargedCredits: 0`), and ask before trying a
    different prompt; a different prompt is a new paid job with a new quote, a
    new yes and a new key.
-6. `video_get_result` returns the `fileId` and a preview link. Share the link and
-   ask whether to use it or try once more.
+6. `video_get_result` returns the `fileId`, the file's `webUrl` and an expiring
+   `downloadUrl`. The `webUrl` is the preview link: paste it as returned (never
+   the `downloadUrl`, which is for fetching bytes) and ask whether to use it or
+   try once more.
 
 The **text-to-video** skill has the prompt craft (anchors, camera language,
 what the models can and cannot do); use its patterns, not its endpoint details.
@@ -525,14 +533,14 @@ what the models can and cannot do); use its patterns, not its endpoint details.
 3. `post_video_attach` with the video's `fileId` — the generated video's from
    `video_get_result`, or the person's own clip's from Phase 6b — and the post's
    current `version`. 409 means the post moved — `post_get`, then attach again.
-4. Share the video's preview link and the draft's **`webUrl`**. That page is
-   where the person reviews, approves and publishes, in Studio; you never approve
-   or publish from here.
+4. Share the video's preview link and the draft's **`webUrl`**, both pasted from
+   the results. That page is where the person reviews, approves and publishes, in
+   Studio; you never approve or publish from here.
 
 Say what happened in one short list: the brand (link), the material count, the
-video (preview link), the draft (link), and the credits spent — as
-`first_post_state`'s `budget.spent` and the job's `billing` report them, never a
-number you added up yourself.
+video (preview link), the draft (link) — every link pasted from a tool result —
+and the credits spent — as `first_post_state`'s `budget.spent` and the job's
+`billing` report them, never a number you added up yourself.
 
 ## When something goes wrong
 
@@ -541,7 +549,7 @@ number you added up yourself.
 | `brand_create` is not a tool | The connector is not set up or the person is on an API key. Send them to Studio's Connect your AI tools guide; stop. |
 | `insufficient_scope` | Name the missing scope (`write` or `render`) and ask them to reconnect and approve it. |
 | 409 `brand_exists` | Use the `kbEntityId` in `details`; do not create another brand. |
-| Two or more brands with the person's name (no website) | List name · id · link and let the person pick, or say "new". Never pick silently. |
+| Two or more brands with the person's name (no website) | List name · id · `webUrl` (both pasted from the hit) and let the person pick, or say "new". Never pick silently. |
 | `brand_create` may or may not have happened | `file_search` by name in the workspace before creating again; never create twice in one session. |
 | 402 on a paid start | A shortfall; nothing was charged. Say the numbers it carries (`requiredCredits`, `spendableCredits`, `shortfallCredits`), offer its cheaper `quote.recommended` or `alternatives` before a top-up, and quote the one the person picks; a new submission needs their yes and a NEW `idempotencyKey`. The `billingWebUrl` is where a workspace owner adds credits. |
 | 400 `INVALID_ADVANCED_OPTIONS` on `video_generate` | The settings are not supported; nothing was charged. Offer the priced alternatives it carries, quote the one the person picks, and submit it with their yes and a NEW key. |
@@ -584,3 +592,9 @@ number you added up yourself.
 - **The links are the finish.** The video preview and the draft's `webUrl` end
   the job; approval and publishing happen in Studio, and the credits spent are
   what `first_post_state`'s budget and the job's `billing` say.
+- **Links are pasted, never typed.** Every link you show is copied character for
+  character from a tool result — a `webUrl`, a preview link, or a `link` field
+  when the result carries one (then prefer `link`). Never type an id, never
+  build a URL from an id, never shorten or "fix" one: two ids in one session
+  can differ in their last two characters. A result with no link gets no link;
+  say where the thing lives instead.
