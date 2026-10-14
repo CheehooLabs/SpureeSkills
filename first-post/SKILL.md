@@ -339,20 +339,27 @@ is, or point at the brand page (`<brand webUrl>`); never type a file id.
 
 ## Phase 4 — The quote
 
-Nothing paid has happened yet. Before this quote, complete Phase 6/6b's
-reference inspection and mode selection, including uploading an eligible direct
-reference. Include the actual intended references in this quote so the workflow
-cost does not silently omit video-reference processing.
+Nothing paid has happened yet. **Do Phase 6/6b's reference inspection, upload
+and mode selection now, then return here.** That analysis uses the intake and
+does not require built brand memory. At this pre-build pass, prepare the clip
+and plan only; generation and draft attachment wait until after Phase 5.
+Include the actual intended references in this budget quote so its cost includes
+video-reference processing. Use a provisional prompt from the intake and
+reference plan; Phase 7 writes the final prompt from the built brand memory,
+quotes it again, and obtains a separate generation approval.
 
 1. With the material in place, call `video_quote` with `brandId` = the brand's
    `kbEntityId`, `folderId` = the campaign project, the planned video at the
    preset (`ratio: "9:16"`, `resolution: "720p"`, `duration: 15`, no model) and a
-   prompt for it and the selected references. Show the person `workflow.steps` (the brand build —
+   provisional prompt and the selected references. Show the person `workflow.steps` (the brand build —
    an estimate until it runs —, the video, the draft at 0),
    `workflow.totalCredits`, `balance.availableCredits` and
    `workflow.expectedRemainingCredits`, in their words.
 2. Show the quote as the price review for Phase 5; one explicit yes to the
-   named brand build and its price covers that step. If `workflow.fits` is false,
+   named brand build and its price covers that step. Before that yes, say that
+   the first brand-memory build publishes live automatically when it completes;
+   this is not publication of the social post. The yes approves the build only,
+   not the provisional video. If `workflow.fits` is false,
    say the gap first (`workflow.totalCredits` minus `workflow.availableCredits`),
    then offer `recommended` or another entry of `alternatives` — a shorter or
    lower-resolution video, never a change to the brand content — and quote again
@@ -377,8 +384,10 @@ cost does not silently omit video-reference processing.
    Phase 4 estimate when that tool is unavailable — say that a first build goes live by
    itself when it completes, and ask for an explicit yes. Do not proceed on
    silence or a yes to something else. If the person already explicitly
-   approved this named build and unchanged quoted price in Phase 4, proceed
-   with that approval rather than asking the same question again.
+   approved this named build and unchanged quoted price in Phase 4 **after
+   the automatic live-publication disclosure**, proceed with that approval
+   rather than asking the same question again. If that disclosure was missing,
+   state it and obtain approval before starting the build.
 2. After the yes, call `first_post_approve` with `step: "brand_build"`, the
    `kbEntityId`, and the quote: the build's credits from `video_quote`'s
    `workflow.steps` with `source: "quote"` (or the Phase 4 estimate with
@@ -414,7 +423,8 @@ is Phase 6b; it may also be read the way a reel is.
    file (never material) — in Studio, or you do it with `file_upload_start` /
    `file_upload_complete`, `sessionId` = the project, no `kbMaterial` —, you
    find its `fileId` (`folder_list_files` on the project, or `file_search`),
-   and call `video_pattern_read` with that `fileId`. It answers `ready` with
+   and call `video_pattern_read` with that `fileId` and `referenceKind: "reel"`
+   when the tool exposes it. It answers `ready` with
    the pattern (the hook, the beats with their seconds, camera behaviour,
    on-screen text, tone), `analysing` (wait 10 seconds and call again, for up
    to about two minutes), or `failed` (fall back to the local read, steps 2–5).
@@ -473,7 +483,11 @@ assets. Plan exact logos, lettering, percentages, and watermarks as editing
 with the supplied assets. Record position, size, opacity and start/end times;
 "center" means both horizontal and vertical center. Honor a clear placement
 instruction; resolve ambiguity that would obscure an essential feature before
-rendering.
+rendering. Before the paid video approval, verify that a local shell or
+available editing tool can apply those changes and upload the finished video.
+If editing or upload is unavailable, disclose that limit and include a desktop
+or user-upload handoff in the plan; never assume the 64 KB inline uploader can
+carry an edited video.
 
 Keep this plan with the approved brief. When `first_post_approve` exposes
 `brief.creativePlan`, supply:
@@ -515,7 +529,9 @@ is; follow that answer and do not ask again.
    Wan may refuse a 15 s output with a reference clip. `first_post_approve` gets
    the same `settings`, `references` included.
 3. **It is a structure reference.** Read it the way Phase 6 reads a reel
-   (`video_pattern_read`, or the local read). Switch to direct mode only when
+   (`video_pattern_read` with `referenceKind: "own"` when supported, or the local
+   read). Keep the own-footage kind on subsequent polls and in the saved brief.
+   Switch to direct mode only when
    the person chooses it and the clip is eligible; structure-only mode never attaches `@video1`.
 
 ## Phase 7 — The video
@@ -572,9 +588,15 @@ quote, no approval, no job — Phase 8 attaches the clip.
    the `downloadUrl`, which is for fetching bytes) and inspect the output against
    the approved plan. Check the initial, middle,
    and final states, main action, subject identity, timing and ending. Show any
-   mismatch instead of calling it finished. Complete authorized editing with
-   exact assets, and verify overlay placement/timing and final media properties.
-   Save raw and finished outputs separately; attach the finished version. Ask
+   mismatch instead of calling it finished. When a local shell or editing tool
+   and upload path are available, complete authorized editing with exact assets,
+   verify placement/timing and final media properties, and attach the finished
+   version. Save raw and finished outputs separately. If editing or upload is
+   unavailable, attach the available generated file to the same draft, label it
+   as unfinished with the pending changes, and offer a desktop handoff or ask
+   the person to upload their edited file. Keep the plan and existing draft IDs
+   for that handoff; replace the draft attachment once the edited file is ready.
+   Never claim the raw draft includes overlays that were not applied. Ask
    for a new paid approval only when regeneration is needed. Comparison videos
    do not replace the selected draft until the person chooses one.
 
