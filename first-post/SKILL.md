@@ -79,8 +79,9 @@ the material and the reel reach the server, and nothing else.
   MCP-only and works there: run the intake (Phase 0), the project (Phase 1) and
   the brand (Phase 2) as written. In the Phase 0 message, ask for the reel as a
   file attached to the chat, not a link — or, when `video_pattern_read` is in
-  your tool list, say they can upload it to the campaign project in Studio once
-  it exists (Phase 6). Before Phase 3, tell the person once that uploads from
+  your tool list, say they can upload the video file to the campaign project in
+  Studio once it exists, with Upload files — not Add link, which saves only the
+  URL (Phase 6). Before Phase 3, tell the person once that uploads from
   here may be blocked, and that their progress is kept if they are.
 
 Nothing about credits, quotes or approvals changes with where you run.
@@ -423,8 +424,10 @@ is Phase 6b; it may also be read the way a reel is.
 
 1. **Prefer `video_pattern_read` when it is in your tool list.** The server
    reads the reel's structure for you, free, and you need no `yt-dlp` or
-   `ffmpeg`: the person uploads the reel to the campaign project as a plain
-   file (never material) — in Studio, or you do it with `file_upload_start` /
+   `ffmpeg`: the person uploads the reel's video file (the MP4) to the campaign
+   project as a plain file (never material) with Upload files — a saved link
+   (Add link) holds only the URL, and `video_pattern_read` answers that it is a
+   link, not a video — in Studio, or you do it with `file_upload_start` /
    `file_upload_complete`, `sessionId` = the project, no `kbMaterial` —, you
    find its `fileId` (`folder_list_files` on the project, or `file_search`),
    and call `video_pattern_read` with that `fileId` and `referenceKind: "reel"`
@@ -441,10 +444,15 @@ is Phase 6b; it may also be read the way a reel is.
    — the reel's site is usually blocked there too: use the file the person
    attached in Phase 0, or ask for it now. Otherwise, for a link, try
    `yt-dlp -o reference.mp4 "<url>"`
-   if `yt-dlp` is installed; Instagram often refuses anonymous downloads, so if
-   that fails, ask the person to save the video and give you the path, or to pick
-   one of their own posts instead (their own content is the most reliable
-   reference). Do not try to bypass a login wall. A path they give you goes
+   if `yt-dlp` is installed. Instagram often refuses anonymous downloads. **If any
+   download fails** — `yt-dlp`, the browser, `curl` or a fetch — stop at once and
+   do not try another route. Say in one message: "I couldn't download that Reel.
+   Save the MP4 on your device and upload it to <campaign project link> with
+   Upload files (not Add link), then tell me when it's there." — the link pasted
+   from `project_create`'s `webUrl`. Then read it with step 1, or through the
+   **file-management** skill when `video_pattern_read` is not in your tool list.
+   One of their own posts is an equally good reference (their own content is the
+   most reliable). Do not try to bypass a login wall. A path they give you goes
    through the **Local files** check before `ffprobe`.
 3. **Read its shape** with `ffprobe` (duration, aspect) and a scene-cut pass
    (`ffmpeg -i reference.mp4 -vf "select='gt(scene,0.3)',showinfo" -f null -`)
@@ -657,7 +665,8 @@ and the credits spent — as `first_post_state`'s `budget.spent` and the job's
 | 409 `brand_memory_build_in_progress` | Poll `brand_build_status`; never start a second build. |
 | Build `failed` | Report its `error` sentence. Do not rebuild on your own. |
 | `upstream_unavailable` on a paid start | Read your saved state, then the status, before anything else; retry only with the same `idempotencyKey` and body. |
-| Reel will not download | Ask for the file, or for one of their own posts. Never bypass a login wall. |
+| Reel will not download (`yt-dlp`, the browser or a fetch) | Stop; do not try another route. Ask for the MP4 uploaded to the campaign project with Upload files, not Add link (Phase 6, step 2), or for one of their own posts. Never bypass a login wall. |
+| `video_pattern_read` says the file is a saved link | A link card holds only the URL. Ask the person to upload the video file itself with Upload files (not Add link), then call again with the new `fileId`. |
 | `video_pattern_read` answers `analysing` for more than about two minutes, or `failed` | Fall back to the local read (Phase 6, steps 2–5) if you can run `ffmpeg`; in a cloud sandbox, say so once and write the pattern from the person's description of the reel. |
 | `first_post_state` says `approve_video` but the person's clip is the post | Do not quote or generate. Upload the clip to the campaign project if it is not there yet, then `post_video_attach` it; the server then recognises the attached clip and moves on. |
 | Video `failed` with `REFERENCE_VIDEO_PRIVACY` | The reference clip shows a real person; nothing was charged. Offer to use it as structure only, or — when it is their own clip — to attach it to the post as it is (Phase 6b, step 1); a new prompt is a new paid job with a new quote, a new yes and a new key. |
