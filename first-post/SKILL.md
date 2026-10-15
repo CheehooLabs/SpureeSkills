@@ -131,8 +131,9 @@ not given.
    guidelines? If not, I'll write a one-page brand brief from your answers for
    you to approve." Only their own content (material rule, Phase 3); for a
    personal brand their own photos are owned material. Then the video: a reel
-   they like — a link or a local file — teaches structure only and stays
-   inspiration (Phase 6); a clip of their own can be the post itself or the
+   they like — a link or a local file — can be a direct video reference (the
+   clip itself goes to `video_generate`) or teach structure only (Phase 6) —
+   propose the direct reference unless they say otherwise; a clip of their own can be the post itself or the
    material for a new video (Phase 6b). When they hand you their own clip, ask
    in this same message — "Is it the finished post, or material for a new
    video?" — and record the answer: it decides what the quote covers (Phase 4)
@@ -198,8 +199,9 @@ holds. One does not cover the other. So, before you plan uploads or analysis:
    can't read a file, nothing on Spuree's side can change that."
 6. **Then continue.** Once a path reads, re-read only that path and resume the
    phase it belongs to — material to Phase 3, the reel to Phase 6, their own
-   clip to Phase 6b. Someone else's reel remains inspiration: never
-   `kbMaterial`, never a `video_generate` reference. Offer to delete your
+   clip to Phase 6b. Someone else's reel is never `kbMaterial`; it reaches
+   `video_generate` only as a direct reference the person chose (Phase 6,
+   step 6). Offer to delete your
    working copy of a third-party reel at the end of the session; never delete
    the person's own file.
 7. **Never bypass a login wall** to obtain a reel. On Windows, Controlled Folder
@@ -414,8 +416,10 @@ happened, read your saved state and then the build status before anything else.
 
 ## Phase 6 — The reference reel
 
-The reel teaches **structure** — hook, beats, pacing, camera behaviour — never
-content. Nothing from it is copied, quoted or shown. A clip of the person's own
+The reel teaches **structure** — hook, beats, pacing, camera behaviour — and,
+when the person chooses, it is also a **direct video reference**: the clip
+itself goes to `video_generate` as `@video1` (step 6). Its words, product and
+brand are never copied or quoted into the prompt or the caption. A clip of the person's own
 is Phase 6b; it may also be read the way a reel is.
 
 1. **Prefer `video_pattern_read` when it is in your tool list.** The server
@@ -464,18 +468,28 @@ is Phase 6b; it may also be read the way a reel is.
    beats with their lengths, camera behaviour, whether and when on-screen text
    appears, the caption's shape. It names kinds of things — "a reveal", "a
    close-up on texture" — never the original's product, person or words.
-6. **Keep the reel out of the brand and out of generation.** Do not upload it as
-   material, and never pass it to `video_generate` as a reference — that would
-   put the original's subject on screen. If the person wants it kept, it stays
-   in the campaign project as a plain file (no `kbMaterial`); otherwise offer to
-   delete it there, and your working copy, at the end.
+6. **Keep the reel out of the brand; send it to generation only when chosen.**
+   Never upload it as material. When the person chose it as a direct video
+   reference, upload it to the campaign project as a plain file (no
+   `kbMaterial`) and attach it in Phase 7 the way Phase 6b step 2 attaches
+   their own clip: `references: [{type: "file", fileId: "<id>", tag: "@video1"}]`
+   in `video_quote` and `video_generate`, `@video1` named in the prompt, the
+   same clip-length limits (trim a longer reel to the part they want with
+   `ffmpeg` when you can). **Before that quote, tell them once, in plain words,
+   about privacy:** the clip is sent to the video model together with the
+   prompt, and a clip that shows a real person is refused
+   (`REFERENCE_VIDEO_PRIVACY`, nothing charged) — on that refusal, offer
+   structure only. Otherwise the reel stays structure only. If the person wants
+   it kept, it stays in the campaign project as a plain file; otherwise offer
+   to delete it there, and your working copy, at the end.
 
 ### Agree on reference use and the action to preserve
 
 Before the video quote, name the selected mode in plain language: **direct
 video reference**, **structure only**, or **no reference**. A finished clip
-skips generation. Direct mode requires eligible footage the person owns under
-the current connector rules; a third-party reel stays structure only. Never
+of their own skips generation. Any clip can be a direct reference — their own
+or a reel they like — once they have had the privacy notice (Phase 6, step 6);
+`referenceKind` says which. Never
 silently change modes or imply that analysis attached footage to generation.
 
 Write a timestamped plan from what you actually inspected: opening state,
@@ -554,8 +568,8 @@ quote, no approval, no job — Phase 8 attaches the clip.
    of asking generation to reproduce their lettering. For a
    personal brand the prompt describes setting, action and tone — never the
    person's face or body — and no photo of them goes in as a reference. The
-   only video reference is the person's own clip (Phase 6b, `@video1`); a reel
-   never goes in.
+   video reference, if any, is the clip the person chose as a direct reference
+   — their own (Phase 6b) or a reel (Phase 6, step 6) — as `@video1`.
 2. **Settings are the preset** — `9:16`, `720p`, 15 seconds, no model — or the
    alternative the person picked from a quote. A reel shorter than 15 seconds
    may set a shorter duration (never below 4). Never guess a model name or a
@@ -655,7 +669,7 @@ and the credits spent — as `first_post_state`'s `budget.spent` and the job's
 | `video_pattern_read` says the file is a saved link | A link card holds only the URL. Ask the person to upload the video file itself with Upload files (not Add link), then call again with the new `fileId`. |
 | `video_pattern_read` answers `analysing` for more than about two minutes, or `failed` | Fall back to the local read (Phase 6, steps 2–5) if you can run `ffmpeg`; in a cloud sandbox, say so once and write the pattern from the person's description of the reel. |
 | `first_post_state` says `approve_video` but the person's clip is the post | Do not quote or generate. Upload the clip to the campaign project if it is not there yet, then `post_video_attach` it; the server then recognises the attached clip and moves on. |
-| Video `failed` with `REFERENCE_VIDEO_PRIVACY` | The reference clip shows a real person; nothing was charged. Offer to attach the clip to the post as it is (Phase 6b, step 1) or to use it as structure only; a new prompt is a new paid job with a new quote, a new yes and a new key. |
+| Video `failed` with `REFERENCE_VIDEO_PRIVACY` | The reference clip shows a real person; nothing was charged. Offer to use it as structure only, or — when it is their own clip — to attach it to the post as it is (Phase 6b, step 1); a new prompt is a new paid job with a new quote, a new yes and a new key. |
 | A PUT to the upload URL fails with a proxy 403/407, "CONNECT tunnel failed" or a refused connection to the storage host | A network policy, not a glitch — usually a cloud sandbox. Do not retry it by any other route. Follow **When an upload is blocked** (Phase 3): record it through `first_post_state` if it takes `uploadBlocked`, send small files and the brief inline if those tools exist, otherwise one message with the three options. Progress is saved; nothing is created twice. |
 | A path exists (listing, `stat`) but reading it fails with "Operation not permitted" / "Permission denied" | Say so once, keep the intake, offer the accessible-folder copy or the web upload (**Local files**). Do not retry the same path; do not change OS permissions. |
 | A path does not exist | Show the exact string you tried and ask for the corrected path once; offer an `ls` of a folder you *can* read if that helps. |
@@ -665,9 +679,10 @@ and the credits spent — as `first_post_state`'s `budget.spent` and the job's
 
 ## Principles
 
-- **Their content only.** Material is the person's own; their own clip may be
-  the post or a reference; someone else's reel is structure only and never
-  enters the brand or the generation.
+- **Their content only, as material.** Material is the person's own; their own
+  clip may be the post or a reference; someone else's reel never enters the
+  brand, and enters generation only as a direct reference they chose, after
+  the privacy notice.
 - **One build.** Everything uploaded first, then one confirmed build.
 - **Quote first, then a yes per step.** The remaining workflow is quoted before
   the first paid step; every paid step is then named, priced and confirmed on its
