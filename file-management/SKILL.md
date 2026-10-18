@@ -52,7 +52,9 @@ and uses an opaque cursor for pagination.
 | `matchMode` | string | No | `any` | Term matching inside each indexed row: `any` \| `all` \| `phrase`. `any` matches at least one analyzed term, `all` requires every analyzed term, and `phrase` requires ordered adjacent terms. |
 | `format` | string | No | — | Comma-separated file formats, e.g. `txt,md`. Applies to `file` type only. |
 | `entityType` | string | No | — | Comma-separated entity types, e.g. `character,prop`. Applies to `asset` type only. |
+| `organizationId` | string | No | — | Restrict workspace and project content to one organization (ObjectId). Public assets from other workspaces are still returned. An explicit `workspaceId` must belong to this organization. |
 | `workspaceId` | string | No | — | Restrict to a single workspace (ObjectId). Must be one the caller is a member of, else empty result; malformed id → 422. |
+| `includePublicAssets` | boolean | No | `false` | With `workspaceId`, also keep public assets from other workspaces. Has no effect without `workspaceId`. |
 | `projectId` | string | No | — | Restrict to a single project (ObjectId). Must be one the caller can access, else empty result; malformed id → 422. |
 | `createdAfter` | string | No | — | ISO 8601 lower bound on source `createdAt`. **Timezone required** (`Z` or `±HH:MM`) — naive datetimes → 422. |
 | `createdBefore` | string | No | — | ISO 8601 upper bound. Timezone required. |
@@ -61,6 +63,23 @@ and uses an opaque cursor for pagination.
 | `sortBy` | string | No | `relevance` | Result ordering: `relevance` \| `createdAt`. |
 | `sortOrder` | string | No | `desc` | Direction for `sortBy=createdAt`: `asc` \| `desc`. Ignored for relevance, which is always descending. |
 | `includePreview` | boolean | No | `false` | When `true`, **`asset`** results add a short-lived signed `previewUrl` (~1h) and `previewFileFormat` for the cover image/video. Other source types are unaffected; the raw bucket/key pointer is never returned. |
+
+**Scope and public assets.** Results are limited to what the caller may open,
+and that includes assets other workspaces have made public (`visibility:
+"public"`, for example a shared 3D motion library). A search with no `type`,
+`workspaceId` or `projectId` therefore mixes those assets in with the caller's
+own files, and common terms can return many public hits before your own. Any of
+these leaves them out:
+
+- `type=file`: public assets are `asset` results, and file results only come
+  from projects the caller can access.
+- `projectId=<id>`: only that project's content.
+- `workspaceId=<id>`: only that workspace's content, unless
+  `includePublicAssets=true`.
+
+`organizationId` alone does not leave them out. The filter parameter is `type`;
+`sourceType` is only the response field. An unrecognized query parameter such
+as `sourceType=file` is ignored without an error, so the search runs unfiltered.
 
 **Response:** `{ "data": [...], "count": N, "cursor": "<opaque token or null>" }`
 
