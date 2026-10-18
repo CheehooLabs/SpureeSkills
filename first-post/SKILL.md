@@ -1,6 +1,6 @@
 ---
 name: first-post
-description: Take a new Spuree workspace from nothing to a reviewable social post draft with the person's own agent — for a business, a product, or the person themselves (a personal brand with no website and no files is a complete answer). Create the brand, hand it their material or a one-page brand brief they approve, quote the cost, run ONE brand memory build, study a reference reel for pacing or use their own clip as the post or as a reference, generate a short vertical video, and draft the post under the brand. Use when a user says "make my first post", "set up my brand and make a post", "I'm the brand", "start my first campaign", "turn this reel into a post for my brand", "use my video for my first post", or arrives from Studio's "make your first post with your own agent" onboarding prompt. Requires the MCP connector (brand and post tools); with only an API key, point them to the connector first.
+description: Take a new Spuree workspace from nothing to a reviewable social post draft with the person's own agent — for a business, a product, or the person themselves (a personal brand with no website and no files is a complete answer). Create the brand, hand it their material or a one-page brand brief they approve, quote the cost, run ONE brand memory build, study a reference reel for pacing or use their own clip as the post or as a reference, generate a short vertical video, and draft the post under the brand. Use when a user says "make my first post", "set up my brand and make a post", "I'm the brand", "start my first campaign", "turn this reel into a post for my brand", "use my video for my first post", "try the example", or arrives from Studio's "make your first post with your own agent" onboarding prompt — including one that names an example kit. Requires the MCP connector (brand and post tools); with only an API key, point them to the connector first.
 ---
 
 # First Post
@@ -22,7 +22,9 @@ connected to `/mcp`): it uses `first_post_state`, `first_post_approve`,
 `file_search`, `folder_list_files`, and `project_list` / `project_create` —
 plus, where your tool list has them, `file_upload_inline` and `file_create` for
 uploads from a cloud sandbox (**When an upload is blocked**), and
-`video_pattern_read`, which reads a reel's structure on the server (Phase 6).
+`video_pattern_read`, which reads a reel's structure on the server (Phase 6), and
+`first_post_example_start`, which sets up an example kit on the server (**An
+example kit**).
 If `brand_create` is not among your tools, say so and send the person to the
 **Connect your AI tools** guide in Studio to add the connector — the brand and
 post routes do not accept an API key.
@@ -103,6 +105,59 @@ deciding what to do next: a saved `buildId` means poll, not start; a saved
 `idempotencyKey` means replay the same key and body only to learn the outcome,
 never to generate again; a saved `kbEntityId` means reuse, not create. The
 person never repeats an answer because your session ended.
+
+## An example kit
+
+Studio's onboarding page can offer an **example kit**: a ready-made sample brand
+— a brief, a product photo, a reference video, a concept and a suggested
+prompt — published on the public asset site. The person picks "An example" or
+"My own brand" on that page, and the prompt they paste says which:
+
+- **They chose an example.** The prompt names the kit (`kit <id>`) and its
+  folder, `https://assets.stagecontinuity.com/onboarding/kits/<id>/` (or
+  `assets-dev.` on dev). Do not ask whether they want their own brand; follow
+  the steps below instead of Phase 0 to Phase 3. If they say they want their
+  own brand after all, run Phase 0 as written.
+- **They chose their own brand.** Run Phase 0 as written and do not offer an
+  example.
+- **The prompt names no kit.** Nothing here applies.
+
+1. **Set it up.**
+   - With `first_post_example_start` in your tool list, call it with the kit id
+     and the workspace. It creates the campaign project and the brand
+     "<kit name> (example)", copies the kit's brief and product photo in as
+     brand material and its reference video into the project, records them in
+     `first_post_state`, and returns their `fileId`s with the kit's concept,
+     suggested prompt and finishing. Create, upload or copy nothing for the
+     example yourself, and never `brand_create` a second copy; after an
+     uncertain outcome, call `first_post_state` and reuse what it names.
+   - Without it, on the person's computer: read `kit.json` from the kit folder,
+     download each file it lists from the same folder and check each one's
+     `sha256` against `kit.json` — on a mismatch, stop and say so; never use
+     that file. Then create the project (Phase 1), `brand_create` named
+     "<kit name> (example)", upload the brief and the product photo as material
+     (Phase 3), and the reference video to the campaign project without
+     `kbMaterial`.
+   - Without it, in a cloud sandbox: say in one line that the example needs this
+     agent's desktop app or terminal, and offer their own brand (Phase 0).
+2. **Show it.** Say in one line that this is an example brand created in their
+   workspace — the project, the video and the credits are real, and every paid
+   step still needs their yes. Show the concept (title and one line), the
+   preview video's link (`card.previewVideo` in the kit folder — the motion
+   their post will follow), the audience, the voice and the platform, and ask
+   once: "Use this example as-is, or change anything?" The answer is the
+   intake, not a yes to any paid step.
+3. **Then the usual flow.** The brand is new, so Phase 4 quotes its build and
+   the video together, and Phase 5 runs the one build. The reference mode is a
+   **direct video reference** (Phase 6): the product photo is `@image1`, for
+   the product's look; the reference video is `@video1`, for staging, timing
+   and camera only, as `kit.json`'s `generation.references` says. It is
+   already in the project, so skip the download, but still read it
+   (`video_pattern_read`, or a contact sheet), and give the privacy notice
+   with the first quote as usual. In Phase 7, use the kit's suggested prompt
+   (`generation.prompt`) unless the person changed something, and plan its
+   `finishing` overlays as the editing step. Never claim anything about the
+   example business beyond the kit's brief.
 
 ## Phase 0 — Who and what
 
@@ -665,6 +720,8 @@ and the credits spent — as `first_post_state`'s `budget.spent` and the job's
 | 409 `brand_memory_build_in_progress` | Poll `brand_build_status`; never start a second build. |
 | Build `failed` | Report its `error` sentence. Do not rebuild on your own. |
 | `upstream_unavailable` on a paid start | Read your saved state, then the status, before anything else; retry only with the same `idempotencyKey` and body. |
+| An example kit's `kit.json` or a file it lists will not download | Say so once and offer their own brand (Phase 0); do not fetch the kit from anywhere else. |
+| A downloaded kit file's `sha256` does not match `kit.json` | Stop; do not upload or use that file. Say so once and offer their own brand. |
 | Reel will not download (`yt-dlp`, the browser or a fetch) | Stop; do not try another route. Ask for the MP4 uploaded to the campaign project with Upload files, not Add link (Phase 6, step 2), or for one of their own posts. Never bypass a login wall. |
 | `video_pattern_read` says the file is a saved link | A link card holds only the URL. Ask the person to upload the video file itself with Upload files (not Add link), then call again with the new `fileId`. |
 | `video_pattern_read` answers `analysing` for more than about two minutes, or `failed` | Fall back to the local read (Phase 6, steps 2–5) if you can run `ffmpeg`; in a cloud sandbox, say so once and write the pattern from the person's description of the reel. |
@@ -682,7 +739,8 @@ and the credits spent — as `first_post_state`'s `budget.spent` and the job's
 - **Their content only, as material.** Material is the person's own; their own
   clip may be the post or a reference; someone else's reel never enters the
   brand, and enters generation only as a direct reference they chose, after
-  the privacy notice.
+  the privacy notice. An example kit's files are material only for its own
+  "(example)" brand.
 - **One build.** Everything uploaded first, then one confirmed build.
 - **Quote first, then a yes per step.** The remaining workflow is quoted before
   the first paid step; every paid step is then named, priced and confirmed on its
