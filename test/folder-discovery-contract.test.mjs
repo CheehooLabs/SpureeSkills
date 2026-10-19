@@ -51,7 +51,7 @@ test("rejects generic parameter type, required, and row-set drift", () => {
         ),
     ),
   );
-  assert(result.includes("file-management: search: parameters must be exactly q|type|searchIn|matchMode|format|entityType|workspaceId|projectId|createdAfter|createdBefore|limit|cursor|sortBy|sortOrder|includePreview in order"));
+  assert(result.includes("file-management: search: parameters must be exactly q|type|searchIn|matchMode|format|entityType|organizationId|workspaceId|includePublicAssets|projectId|createdAfter|createdBefore|limit|cursor|sortBy|sortOrder|includePreview in order"));
   assert(result.includes("file-management: search: matchMode required flag must be No"));
   assert(result.includes("file-management: search: limit type must be integer"));
 });
