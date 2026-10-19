@@ -122,26 +122,28 @@ prompt — published on the public asset site. The person picks "An example" or
   example.
 - **The prompt names no kit.** Nothing here applies.
 
-1. **Set it up.**
+1. **Set it up.** The example makes no project: the brand holds the post, and
+   everything it needs goes to the brand.
    - With `first_post_example_start` in your tool list, call it with the kit id
-     and the workspace. It creates the campaign project and the brand
-     "<kit name> (example)", copies the kit's brief and product photo in as
-     brand material and its reference video into the project, records them in
-     `first_post_state`, and returns their `fileId`s with the kit's concept,
-     suggested prompt and finishing. Create, upload or copy nothing for the
-     example yourself, and never `brand_create` a second copy; after an
-     uncertain outcome, call `first_post_state` and reuse what it names.
+     and the workspace. It creates the brand "<kit name> (example)", copies the
+     kit's brief and product photo in as brand material and its reference video
+     into the brand's Generated folder, records them in `first_post_state`, and
+     returns their `fileId`s with the kit's concept, suggested prompt and
+     finishing. Create, upload or copy nothing for the example yourself, and
+     never `brand_create` a second copy; after an uncertain outcome, call
+     `first_post_state` and reuse what it names.
    - Without it, on the person's computer: read `kit.json` from the kit folder,
      download each file it lists from the same folder and check each one's
      `sha256` against `kit.json` — on a mismatch, stop and say so; never use
-     that file. Then create the project (Phase 1), `brand_create` named
-     "<kit name> (example)", upload the brief and the product photo as material
-     (Phase 3), and the reference video to the campaign project without
-     `kbMaterial`.
+     that file. Then `brand_create` named "<kit name> (example)" — no
+     `project_create` — upload the brief and the product photo as material
+     (Phase 3), and the reference video to the brand without `kbMaterial`
+     (`file_upload_start` with `sessionId` = the brand's `kbEntityId`); it lands
+     in the brand's Generated folder.
    - Without it, in a cloud sandbox: say in one line that the example needs this
      agent's desktop app or terminal, and offer their own brand (Phase 0).
 2. **Show it.** Say in one line that this is an example brand created in their
-   workspace — the project, the video and the credits are real, and every paid
+   workspace — the brand, the video and the credits are real, and every paid
    step still needs their yes. Show the concept (title and one line), the
    preview video's link (`card.previewVideo` in the kit folder — the motion
    their post will follow), the audience, the voice and the platform, and ask
@@ -152,9 +154,12 @@ prompt — published on the public asset site. The person picks "An example" or
    **direct video reference** (Phase 6): the product photo is `@image1`, for
    the product's look; the reference video is `@video1`, for staging, timing
    and camera only, as `kit.json`'s `generation.references` says. It is
-   already in the project, so skip the download, but still read it
-   (`video_pattern_read`, or a contact sheet), and give the privacy notice
-   with the first quote as usual. In Phase 7, use the kit's suggested prompt
+   already in the brand's Generated folder, so skip the download, but still
+   read it (`video_pattern_read`, or a contact sheet), and give the privacy
+   notice with the first quote as usual. Wherever a later phase names the
+   campaign project for the example — as `folderId` for `video_quote` and
+   `video_generate`, or as the place for an upload — use the brand's
+   `kbEntityId` instead. In Phase 7, use the kit's suggested prompt
    (`generation.prompt`) unless the person changed something, and plan its
    `finishing` overlays as the editing step. Never claim anything about the
    example business beyond the kit's brief.
