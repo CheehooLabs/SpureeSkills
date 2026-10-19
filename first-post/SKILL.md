@@ -19,7 +19,7 @@ connected to `/mcp`): it uses `first_post_state`, `first_post_approve`,
 `brand_build_start`, `brand_build_status`, `brand_pending_read` /
 `brand_pending_commit`, `video_quote`, `video_generate` / `video_get_status` /
 `video_get_result`, `post_draft_create`, `post_get`, `post_video_attach`,
-`file_search`, and `project_list` (to find the workspace) —
+`file_search`, `folder_list_files`, and `project_list` (to find the workspace) —
 plus, where your tool list has them, `file_upload_inline` and `file_create` for
 uploads from a cloud sandbox (**When an upload is blocked**), and
 `video_pattern_read`, which reads a reel's structure on the server (Phase 6).
@@ -225,8 +225,11 @@ brand holds this post.
   folder**. The person sees it on the brand page's Files tab, Generated view —
   the `<brand files link>` is the brand's `webUrl` with
   `?tab=all-files&files=generated`. A file the person uploads there themselves
-  you find with `file_search` by its name; you are never given the folder's own
-  id.
+  you find by listing that folder: `folder_list_files` on the brand's
+  `kbEntityId` answers `generatedFolderId` (the brand's own listing holds only
+  its material), and `folder_list_files` on that id lists the folder. Fall back
+  to `file_search` by its name for a file not listed yet. `generatedFolderId` is
+  a folder id: never pass it as a `brandId` or `kbEntityId`.
 
 ## Phase 2 — The brand
 
@@ -437,7 +440,7 @@ is Phase 6b; it may also be read the way a reel is.
    (Add link) holds only the URL, and `video_pattern_read` answers that it is a
    link, not a video — in Studio, or you do it with `file_upload_start` /
    `file_upload_complete`, `sessionId` = the brand's `kbEntityId`, no
-   `kbMaterial` —, you find its `fileId` (`file_search` by its name),
+   `kbMaterial` —, you find its `fileId` (list the Generated folder as in Phase 1),
    and call `video_pattern_read` with that `fileId` and `referenceKind: "reel"`
    when the tool exposes it. It answers `ready` with
    the pattern (the hook, the beats with their seconds, camera behaviour,
@@ -544,7 +547,7 @@ is; follow that answer and do not ask again.
    `file_upload_start` with `sessionId` = the brand's `kbEntityId`, no `kbMaterial`, the
    exact byte size → PUT → `file_upload_complete` — or, from a cloud sandbox,
    have the person upload it to the `<brand files link>` in Studio and find
-   its `fileId` with `file_search`. Skip Phase 7 entirely: no quote, no credits. In Phase 8,
+   its `fileId` by listing the Generated folder (Phase 1). Skip Phase 7 entirely: no quote, no credits. In Phase 8,
    `post_video_attach` that `fileId`.
 2. **It is material for a new video.** Phase 7 runs with the clip as `@video1`:
    upload it as above, pass
