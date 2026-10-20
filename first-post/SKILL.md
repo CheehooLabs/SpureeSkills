@@ -122,6 +122,29 @@ prompt — published on the public asset site. The person picks "An example" or
   example.
 - **The prompt names no kit.** Nothing here applies.
 
+**An example that stars the person.** A kit can star the person themself: the
+prompt says the example stars them, and `kit.json` has `requires: ["likeness"]`
+and a `generation.references` entry with `likeness: "self"` instead of a file
+(for example `@image2`). Choosing it is their request to appear — as their own
+verified likeness only (a `likeness_list` item with `isMine`), never anyone
+else's. Before step 1:
+
+- FIRST call `likeness_list`. If it reads `available: false`, tell them in one
+  line that verified likeness is not open to their account, and offer a
+  face-free example or their own brand (Phase 0).
+- If it lists no `isMine` item, give them its `likenessWebUrl` to verify
+  themself and add a photo, wait until they say they are done, then call
+  `likeness_list` again.
+- Only once it lists an `isMine` item, go on to step 1. If
+  `first_post_example_start` answers `likeness_not_ready`, do the same and call
+  it again with the same kit id; it refuses before it creates anything, so
+  nothing is lost.
+- In every `video_quote` and `video_generate` for this example, add their newest
+  `isMine` `referenceId` (by `createdAt`) as `{type: likeness, referenceId, tag:
+  @image2}` — one per likeness slot, with the slot's tag — and say in the
+  prompt that the tag is them. Call `likeness_list` again before each quote,
+  because they can withdraw their likeness at any time.
+
 1. **Set it up.** The example makes no project: the brand holds the post, and
    everything it needs goes to the brand.
    - With `first_post_example_start` in your tool list, call it with the kit id
@@ -133,7 +156,9 @@ prompt — published on the public asset site. The person picks "An example" or
      never `brand_create` a second copy; after an uncertain outcome, call
      `first_post_state` and reuse what it names.
    - Without it, on the person's computer: read `kit.json` from the kit folder,
-     download each file it lists from the same folder and check each one's
+     download each file it lists from the same folder (skip the files whose
+     `role` is `preview` or `preview_poster`: they are only shown on the page,
+     never uploaded or used as a reference) and check each one's
      `sha256` against `kit.json` — on a mismatch, stop and say so; never use
      that file. Then `brand_create` named "<kit name> (example)" — no
      `project_create` — upload the brief and the product photo as material
@@ -146,14 +171,17 @@ prompt — published on the public asset site. The person picks "An example" or
    workspace — the brand, the video and the credits are real, and every paid
    step still needs their yes. Show the concept (title and one line), the
    preview video's link (`card.previewVideo` in the kit folder — the motion
-   their post will follow), the audience, the voice and the platform, and ask
+   their post will follow; when its file's `role` is `preview`, it is a sample
+   of what this example looks like, not the motion — for an example that stars
+   them, their video stars them), the audience, the voice and the platform, and ask
    once: "Use this example as-is, or change anything?" The answer is the
    intake, not a yes to any paid step.
 3. **Then the usual flow.** The brand is new, so Phase 4 quotes its build and
    the video together, and Phase 5 runs the one build. The reference mode is a
    **direct video reference** (Phase 6): the product photo is `@image1`, for
    the product's look; the reference video is `@video1`, for staging, timing
-   and camera only, as `kit.json`'s `generation.references` says. It is
+   and camera only, as `kit.json`'s `generation.references` says; in an example
+   that stars them, their own likeness fills its slot (`@image2`, above). It is
    already in the brand's Generated folder, so skip the download, but still
    read it (`video_pattern_read`, or a contact sheet), and give the privacy
    notice with the first quote as usual. As in every journey, the brand's
@@ -767,7 +795,8 @@ and the credits spent — as `first_post_state`'s `budget.spent` and the job's
   labelled as proposed; nothing is asked twice.
 - **Facts from the person and the brand memory.** No invented claims, credentials,
   rankings, numbers or testimonials, and no likeness: a personal brand's
-  generated video shows setting, action and tone, never the person's face.
+  generated video shows setting, action and tone, never the person's face —
+  except through their own verified likeness, in an example that stars them.
 - **The links are the finish.** The video preview and the draft's `webUrl` end
   the job; approval and publishing happen in Studio, and the credits spent are
   what `first_post_state`'s budget and the job's `billing` say.
