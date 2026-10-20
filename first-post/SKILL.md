@@ -109,7 +109,7 @@ person never repeats an answer because your session ended.
 ## An example kit
 
 Studio's onboarding page can offer an **example kit**: a ready-made sample brand
-— a brief, a product photo, a reference video, a concept and a suggested
+— a brief, a product photo, a reference video when it has one, a concept and a suggested
 prompt — published on the public asset site. The person picks "An example" or
 "My own brand" on that page, and the prompt they paste says which:
 
@@ -149,8 +149,8 @@ else's. Before step 1:
    everything it needs goes to the brand.
    - With `first_post_example_start` in your tool list, call it with the kit id
      and the workspace. It creates the brand "<kit name> (example)", copies the
-     kit's brief and product photo in as brand material and its reference video
-     into the brand's Generated folder, records them in `first_post_state`, and
+     kit's brief and product photo in as brand material and its reference video,
+     when the kit has one, into the brand's Generated folder, records them in `first_post_state`, and
      returns their `fileId`s with the kit's concept, suggested prompt and
      finishing. Create, upload or copy nothing for the example yourself, and
      never `brand_create` a second copy; after an uncertain outcome, call
@@ -162,7 +162,7 @@ else's. Before step 1:
      `sha256` against `kit.json` — on a mismatch, stop and say so; never use
      that file. Then `brand_create` named "<kit name> (example)" — no
      `project_create` — upload the brief and the product photo as material
-     (Phase 3), and the reference video to the brand without `kbMaterial`
+     (Phase 3), and the reference video, when the kit lists one, to the brand without `kbMaterial`
      (`file_upload_start` with `sessionId` = the brand's `kbEntityId`); it lands
      in the brand's Generated folder.
    - Without it, in a cloud sandbox: say in one line that the example needs this
@@ -177,19 +177,31 @@ else's. Before step 1:
    once: "Use this example as-is, or change anything?" The answer is the
    intake, not a yes to any paid step.
 3. **Then the usual flow.** The brand is new, so Phase 4 quotes its build and
-   the video together, and Phase 5 runs the one build. The reference mode is a
-   **direct video reference** (Phase 6): the product photo is `@image1`, for
-   the product's look; the reference video is `@video1`, for staging, timing
-   and camera only, as `kit.json`'s `generation.references` says; in an example
-   that stars them, their own likeness fills its slot (`@image2`, above). It is
-   already in the brand's Generated folder, so skip the download, but still
-   read it (`video_pattern_read`, or a contact sheet), and give the privacy
-   notice with the first quote as usual. As in every journey, the brand's
-   `kbEntityId` is the `folderId` for `video_quote` and `video_generate` and
-   the place for any upload. In Phase 7, use the kit's suggested prompt
-   (`generation.prompt`) unless the person changed something, and plan its
-   `finishing` overlays as the editing step. Never claim anything about the
-   example business beyond the kit's brief.
+   the video together, and Phase 5 runs the one build. The product photo is
+   `@image1`, for the product's look, and in an example that stars them, their
+   own likeness fills its slot (`@image2`, above). The reference mode follows
+   `kit.json`'s `generation.references`:
+   - **The kit has a `@video1`:** it is a **direct video reference** (Phase 6),
+     for staging, timing and camera only. It is already in the brand's
+     Generated folder, so skip the download, but still read it
+     (`video_pattern_read`, or a contact sheet), and give the privacy notice
+     with the first quote as usual.
+   - **The kit has no `@video1`:** the reference mode is **none** — no reference
+     video is attached, and the kit's prompt describes the camera and the
+     action in words. Skip Phase 6 (there is no reference clip to read) and
+     give no reference-video privacy notice.
+
+   When `kit.json` has `generation.advancedOptions` (also returned by
+   `first_post_example_start`), pass them as `advancedOptions` exactly as the
+   kit sets them in every `video_quote` and `video_generate` for this example,
+   beside any model the person chooses: they are part of how the kit was made
+   to work (`cameraFixed` keeps the camera still, so the person stays in place
+   in the shot), so never drop or change them unless the person asks. As in
+   every journey, the brand's `kbEntityId` is the `folderId` for `video_quote`
+   and `video_generate` and the place for any upload. In Phase 7, use the
+   kit's suggested prompt (`generation.prompt`) unless the person changed
+   something, and plan its `finishing` overlays as the editing step. Never
+   claim anything about the example business beyond the kit's brief.
 
 ## Phase 0 — Who and what
 
