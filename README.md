@@ -42,6 +42,7 @@ Connect Claude Code, Claude Code Web & Cowork, ChatGPT, Codex, or OpenClaw — v
 | [File Comments](./file-comment/SKILL.md) | Add, list, resolve, update, and delete review comments on files — anchored to a line range, a video timecode, or a still — with drawings, threaded replies, and @mentions |
 | [Project Invitations](./project-invitation/SKILL.md) | Manage sharing invitations for non-workspace members |
 | [Workspace Management](./workspace-management/SKILL.md) | List a workspace's members, add a member with a role, change a role, remove a member |
+| [Report Feedback](./report-feedback/SKILL.md) | Send the Spuree team a bug report, feedback or a feature request as the person, after they approve the exact text, and check the status of their own reports — over the MCP connector |
 
 ## Authentication
 

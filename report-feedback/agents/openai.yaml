@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spuree Report Feedback"
+  short_description: "Send the Spuree team a bug report or feedback, and check on your reports"
+  default_prompt: "Use $report-feedback to send the Spuree team a bug report about what just happened"
