@@ -699,11 +699,11 @@ List the files directly in a folder, or every file under an asset. Use this when
 **Example:**
 
 ```bash
-# Get all files (flattened, including sub-folders)
+# Default: an asset session returns its whole sub-tree; an ordinary folder returns its direct files only
 curl "https://data.spuree.com/api/v1/sessions/64a7b8c9d1e2f3a4b5c6d7e8/files" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 
-# Get only direct files in this folder
+# Only the files directly on this session, even for an asset
 curl "https://data.spuree.com/api/v1/sessions/64a7b8c9d1e2f3a4b5c6d7e8/files?flatten=false" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 ```
