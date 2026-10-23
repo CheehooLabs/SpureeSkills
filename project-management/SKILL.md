@@ -313,11 +313,13 @@ List the project's owner and each collaborator with their role. **Owner or share
 {
   "owner": "owner@example.com",
   "sharedWith": [
-    { "email": "collaborator@example.com", "permission": "editor" },
-    { "email": "reviewer@example.com", "permission": "viewer" }
+    { "email": "collaborator@example.com", "permission": "editor", "creditLimit": { "limit": 500, "spent": 120 } },
+    { "email": "reviewer@example.com", "permission": "viewer", "creditLimit": null }
   ]
 }
 ```
+
+Each `sharedWith` entry is `{ email, permission, creditLimit }`. `creditLimit` is `null` unless you are the project owner and the member spends under a limit (an invited admin or editor from outside the project's workspace); then it is `{ limit, spent }`, where `limit` is the credits they may spend in this project (`null` means no limit) and `spent` the credits counted against it since the last reset.
 
 ```bash
 curl "https://data.spuree.com/api/v1/projects/{projectId}/share" \

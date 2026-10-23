@@ -410,7 +410,7 @@ Only users with access to the file can be mentioned; tokens for other users are 
 | `startLine` | integer? | Start line (line-anchored top-level comments only) |
 | `endLine` | integer? | End line (line-anchored top-level comments only) |
 | `sourceText` | string? | Annotated source snapshot (line-anchored top-level comments only) |
-| `anchor` | object? | Where the comment points: `{"kind": "line", "startLine", "endLine"}`, `{"kind": "time", "startMs", "endMs"}`, or `{"kind": "image"}`. Always present on a top-level comment — line anchors are derived for comments written before time anchors existed. Absent on replies, which inherit their parent's |
+| `anchor` | object? | Where the comment points: `{"kind": "line", "startLine", "endLine"}`, `{"kind": "time", "startMs", "endMs"}`, or `{"kind": "image"}`. Always present on a top-level comment — line anchors are derived for comments written before time anchors existed. Absent on replies, which inherit their parent's. Every anchor carries all of `kind`, `startLine`, `endLine`, `startMs`, `endMs`, and `drawing`; the fields its `kind` doesn't use are `null` — a line anchor has `startMs`/`endMs`/`drawing` `null` |
 | `anchor.drawing` | array? | Marks on the picture, on a `time` or `image` anchor. Each is `{ type, color, points }` with normalized 0..1 coordinates — see Drawings |
 | `fileVersion` | string? | The file's checksum when the comment was written. Compare against the file's current checksum before trusting a mark's position. Absent on older comments, which means unknown, not matching |
 | `status` | string | `pending` or `resolved` |

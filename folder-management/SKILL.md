@@ -644,9 +644,9 @@ curl "https://data.spuree.com/api/v1/sessions/64a7b8c9d1e2f3a4b5c6d7e8/assets" \
 
 ### GET /v1/sessions/{sessionId}/files
 
-List the files directly in a folder (optionally flattened to include sub-folder files). Use this when you need file records for a known folder without browsing sub-folders.
+List the files directly in a folder, or every file under an asset. Use this when you need file records for a known folder without browsing sub-folders.
 
-**Description:** Returns files associated with a folder. By default, flattens results to include files from sub-folders via entity session linkage.
+**Description:** Returns the files directly in a folder or project. For an asset (entity) session, `flatten=true` (the default) instead returns every file in the asset's sub-tree, matched by `entitySessionId`. Files inside an ordinary sub-folder are never included: walk sub-folders with `GET /v1/sessions/{sessionId}/children` and list each one's files.
 
 **Path Parameters:**
 
@@ -658,7 +658,7 @@ List the files directly in a folder (optionally flattened to include sub-folder 
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `flatten` | boolean | `true` | `true`: files by `entitySessionId` (includes sub-folders). `false`: files by direct `sessionId` only |
+| `flatten` | boolean | `true` | Applies only to an asset (entity) session. `true`: every file in the asset's sub-tree, by `entitySessionId`. `false`: only the files directly on this session (`sessionId`). Ignored on an ordinary folder or project, which always returns its direct files only — never files in ordinary sub-folders |
 | `limit` | integer | 100 | Results per page (max: 500) |
 | `offset` | integer | 0 | Number of items to skip |
 
@@ -699,11 +699,11 @@ List the files directly in a folder (optionally flattened to include sub-folder 
 **Example:**
 
 ```bash
-# Get all files (flattened, including sub-folders)
+# Default: an asset session returns its whole sub-tree; an ordinary folder returns its direct files only
 curl "https://data.spuree.com/api/v1/sessions/64a7b8c9d1e2f3a4b5c6d7e8/files" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 
-# Get only direct files in this folder
+# Only the files directly on this session, even for an asset
 curl "https://data.spuree.com/api/v1/sessions/64a7b8c9d1e2f3a4b5c6d7e8/files?flatten=false" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 ```
@@ -898,11 +898,16 @@ POST /v1/sessions { name: "Heroes", parentSessionId: "folder1" }
 
 ### Download All Files in a Folder
 
-1. **List files** in the folder:
+1. **List files** directly in the folder:
 
    ```
-   GET /v1/sessions/{folderId}/files?flatten=true → { files: [...] }
+   GET /v1/sessions/{folderId}/files → { files: [...] }
    ```
+
+   This does not include files in sub-folders (`flatten` reaches into an
+   asset's sub-tree only). If the user wants sub-folders too, list them with
+   `GET /v1/sessions/{folderId}/children`, and for each item with
+   `type: "session"` repeat this step on its `id`.
 
 2. **Get download URLs** in bulk:
 
