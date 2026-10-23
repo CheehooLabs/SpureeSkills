@@ -412,8 +412,13 @@ API keys don't expire by default (unless `expiresAt` is set) and don't need refr
 | 401 (account locked) | 5 failed login attempts | Wait 15 minutes, then retry |
 | 401 (invalid refresh token) | Token expired, revoked, or reused | Log in again with email/password |
 | 401 (invalid exchange code) | Code expired or already used | Request a new exchange code |
-| 429 (rate limit) | More than 10 requests/min from same IP | Wait and retry with backoff |
+| 429 (rate limit) | Auth endpoints: more than 10 requests/min from same IP. V1 data API: over the per-credential limit (see Rate Limits) | Wait the `Retry-After` seconds, then retry with backoff |
 
 ## Rate Limits
 
 All authentication endpoints share the same rate limit: **10 requests per minute per IP**. Implement exponential backoff when receiving 429 responses.
+
+The V1 data API (`https://data.spuree.com/api/v1/...`) is rate limited too, per credential: an API key per key, counted in one-minute windows, with search requests counted apart from everything else; an OAuth token per app and user. Over the limit, a request gets `429` with a `Retry-After` header (seconds until you may retry) and the body `{"detail": "Rate limit exceeded"}`; routes that answer errors in the V1 envelope return `{"error": {"code": "RATE_LIMIT_EXCEEDED", "details": {"retryAfterSeconds": N}, ...}}` instead.
+
+- On a 429, wait the `Retry-After` seconds before the next request — don't retry immediately — and keep backing off if it repeats.
+- Don't hard-code a quota; the limits are server configuration. Pace long loops (bulk uploads, walking many folders) instead of firing requests back to back, and prefer batch endpoints such as `POST /v1/sessions/files/download/urls`.

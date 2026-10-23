@@ -301,7 +301,7 @@ The caller **must** then upload to S3 **and** call `POST /v1/files/{fileId}/uplo
 | --- | --- |
 | 200 | Record created, presigned URL(s) returned |
 | 404 | Session not found |
-| 409 | Two distinct conflicts — discriminate by `body.detail.code`: **present** ⇒ upload/checksum conflict (see **409 conflict codes** under `PUT /v1/files/{fileId}`; do NOT retry with a mutated name); **absent** ⇒ filename conflict (use a different name or target) |
+| 409 | A name conflict, never an upload or checksum conflict (those come only from `PUT /v1/files/{fileId}` and the resume endpoint), and never a `code` at the top level. Usually a file with this name and format already exists in the folder: `body.detail` is an **object**, `{ message: "File already exists", existingFileId, existingChecksum, existingFileName, existingFileFormat, suggestedName }` — upload under `suggestedName` or a different name or target. See **Where the `code` lives** under `PUT /v1/files/{fileId}` for the two rarer 409s |
 
 ```bash
 curl -X POST "https://data.spuree.com/api/v1/files" \
@@ -390,22 +390,26 @@ After receiving the response, upload to S3 then call `POST /v1/files/{fileId}/up
 | Code | Description |
 | --- | --- |
 | 200 | Lock acquired, presigned URL(s) returned |
-| 409 | Checksum mismatch or locked by another user — disambiguate by the body's `code` (see **409 conflict codes** below) |
+| 409 | Checksum mismatch or locked by another user — disambiguate by the body's top-level `code` (see **409 conflict codes** below) |
 
 **409 conflict codes.** Upload-conflict bodies carry a machine-readable `code`
-on the endpoints listed below, so an agent can branch without guessing:
+at the **top level** of the body, beside a plain-string `detail`, so an agent
+can branch without guessing:
+
+```json
+{"detail": "Conflict: file was modified by another user", "code": "CHECKSUM_CONFLICT", "retryable": false}
+```
 
 - `UPLOAD_LOCK_CONFLICT` — another user holds the upload lock; `retryable: true`.
-  A retry hint (`retryAfterSeconds`, seconds until the lock expires) exists
-  **only on the resume endpoint** — `POST`/`PUT` lock conflicts carry no
-  timing hint. Policy: on `POST`/`PUT`, retry **once** after a short fixed
-  backoff (30–60 s); on resume, wait `retryAfterSeconds` only when short
-  (≲ 2 minutes). In every case, after one failed retry stop and surface the
-  lock to the user — never sleep toward the raw lock expiry (1 h single /
-  6 h multipart). `holder`/`acquiredAt` appear **only if the service operator
-  has explicitly enabled full disclosure mode**; treat them as absent, and if
-  they do appear, do not surface another user's identity or activity to your
-  user.
+  The body carries `retryAfterSeconds` (seconds until the lock expires, at
+  least 1) and the response repeats it in a `Retry-After` header, on both
+  `PUT` and resume. Policy: wait `retryAfterSeconds` and retry **once** only
+  when it is short (≲ 2 minutes); otherwise, or after that one retry fails,
+  stop and surface the lock to the user — never sleep toward a long lock
+  expiry (up to 1 h single / 6 h multipart). `holder`/`acquiredAt` appear
+  **only if the service operator has explicitly enabled full disclosure
+  mode**; treat them as absent, and if they do appear, do not surface another
+  user's identity or activity to your user.
 - `CHECKSUM_CONFLICT` — your `expectedChecksum` no longer matches: someone
   else changed the file after you read it. `retryable: false`, and **do not
   auto-retry by refreshing the checksum**: re-sending your original bytes with
@@ -422,13 +426,18 @@ on the endpoints listed below, so an agent can branch without guessing:
 
 | Endpoint | 409 body shape |
 | --- | --- |
-| `POST /v1/files`, `PUT /v1/files/{fileId}` — upload/checksum conflicts | code nested: `body.detail.code`, with `message` and `retryable` alongside (no `retryAfterSeconds` here) |
-| `GET /v1/files/{fileId}/upload` (resume) | code at top level: `body.code` (nullable), `retryAfterSeconds` alongside. **`code` null/absent ⇒ "not in pending status" — not retryable: do not wait, surface to the user** |
-| Filename conflicts (`POST /v1/files`, `PATCH /v1/files/{fileId}`) | **no code** — plain error body |
+| `PUT /v1/files/{fileId}` — upload/checksum conflicts | code at top level: `body.code`, with `detail` (a string) and `retryable` alongside; `UPLOAD_LOCK_CONFLICT` adds `retryAfterSeconds` and a `Retry-After` header |
+| `PUT /v1/files/{fileId}` — `code` absent | `{"detail": "Conflict: file upload state changed during preparation; refresh and retry"}` — re-read the file's checksum and retry once |
+| `GET /v1/files/{fileId}/upload` (resume) | code at top level: `body.code` (nullable), same shape as `PUT`. **`code` null/absent ⇒ "not in pending status" or "upload ID replaced" — not retryable: do not wait, surface to the user** |
+| `POST /v1/files` — name already used in the folder | **no code** — `body.detail` is an object: `{ message, existingFileId, existingChecksum, existingFileName, existingFileFormat, suggestedName }` |
+| `POST /v1/files` — name used by a different kind of file (`kbMaterial: true` brand material vs an ordinary file, either way round) | **no top-level code** — the V1 error envelope: `{"error": {"code": "CONFLICT", "message", "requestId", "details": { existingFileId, existingChecksum, existingFileName, existingFileFormat, suggestedName }}, "detail": "<message>"}` |
+| `POST /v1/files` — no free "keep both" name left | **no code** — `{"detail": {"message": "Too many duplicate-named files in this session", "suggestedName": null}}` |
+| `PATCH /v1/files/{fileId}` — filename conflict in the target | **no code** — `body.detail` is a string |
 
-`POST /v1/files` can return either of two 409s; the discriminator is the
-field itself: **`body.detail.code` present ⇒ upload/checksum conflict;
-absent ⇒ filename conflict** (use a different name or target).
+No file endpoint nests the code at `body.detail.code`: read `body.code`. On
+`PUT` and resume, **`body.code` present ⇒ upload/checksum conflict** (above);
+on `POST /v1/files` every 409 is a name conflict — use `suggestedName`, a
+different name, or a different target.
 
 ```bash
 curl -X PUT "https://data.spuree.com/api/v1/files/{fileId}" \
@@ -456,7 +465,7 @@ Resume a multipart upload. Returns which parts are already in S3 and fresh presi
 | --- | --- |
 | 200 | Success |
 | 400 | No active multipart upload |
-| 409 | Two causes, discriminated by top-level `body.code`: `UPLOAD_LOCK_CONFLICT` (locked by another user — retryable, `retryAfterSeconds` alongside) or **`code` null/absent** (not in pending status — **not retryable**: do not wait, surface to the user) |
+| 409 | Discriminated by top-level `body.code`: `UPLOAD_LOCK_CONFLICT` (locked by another user — retryable, `retryAfterSeconds` alongside), `CHECKSUM_CONFLICT` (the `checksum` you sent no longer matches the pending upload — not retryable), or **`code` null/absent** (not in pending status, or the upload ID was replaced — **not retryable**: do not wait, surface to the user) |
 
 ```bash
 curl "https://data.spuree.com/api/v1/files/{fileId}/upload" \
@@ -700,6 +709,6 @@ S3 key: `works_{workspaceId}/sess_{sessionId}/file_{fileId}`
 | 403 | No workspace access or edit permission | Check permissions |
 | 404 | File or session not found | Verify IDs |
 | 409 (`code: CHECKSUM_CONFLICT`) | File changed since you read it | Default: surface the conflict to the user. Text-like files only: re-fetch content, re-apply your change on top, recompute checksums, retry. **Never** re-send original bytes with a refreshed checksum (silent lost update) |
-| 409 (`code: UPLOAD_LOCK_CONFLICT`) | Another user is uploading | POST/PUT: retry once after 30–60 s (no timing hint in the body). Resume: wait `retryAfterSeconds` when short (≲ 2 min). Then surface to the user — never sleep toward the 1 h / 6 h expiry |
-| 409 (filename conflict) | Same name exists in target | Use different name or target |
+| 409 (`code: UPLOAD_LOCK_CONFLICT`) | Another user is uploading (`PUT`, resume) | Wait `retryAfterSeconds` (also the `Retry-After` header) and retry once, only when it is short (≲ 2 min). Otherwise surface to the user — never sleep toward the 1 h / 6 h expiry |
+| 409 (filename conflict, no `code`) | Same name exists in target | Use `suggestedName` (`POST`), a different name, or a different target |
 | 401 | Invalid or expired token | Refresh via **authentication** skill |
