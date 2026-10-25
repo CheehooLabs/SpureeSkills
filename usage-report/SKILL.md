@@ -48,7 +48,7 @@ Retrieve a usage report for a single workspace. The caller must be a workspace o
 | `from` | string (query) | No | Start date inclusive, `yyyy-MM-dd` UTC. Defaults to the first day of the current UTC month. |
 | `to` | string (query) | No | End date inclusive, `yyyy-MM-dd` UTC. Defaults to today in UTC. |
 
-The maximum date range is 366 days. When both `from` and `to` are omitted the default period is the current UTC calendar month to date.
+The maximum date range is 90 days. When both `from` and `to` are omitted the default period is the current UTC calendar month to date.
 
 **Response:**
 
@@ -107,7 +107,7 @@ The maximum date range is 366 days. When both `from` and `to` are omitted the de
 
 `allowances.apiOperations.period` and `allowances.searches.period` count API key and MCP usage only; user (JWT/OAuth) usage is reported in `bySource.users` but never counted against the allowance. `days` likewise includes only API key and MCP sources. `topEndpoints` merges API key and MCP subjects, sorted by `calls` descending, up to 20 entries.
 
-**Attribution.** API-key usage counts toward the scope by the key's owner membership or its explicit organization scope. MCP and signed-in (JWT) usage count only for users whose non-personal workspace memberships all fall inside this workspace or organization; users who also belong to workspaces outside the scope are excluded and appear only in `excludedAmbiguousUsers`. Signed-in user usage is reported in `bySource.users` but is never counted against the allowance.
+**Attribution.** API-key usage counts toward the scope by the key's owner membership or its explicit organization scope. MCP and signed-in (JWT) usage count only for users whose non-personal workspace memberships all fall inside this workspace or organization; users who also belong to workspaces outside the scope are excluded and appear only in `excludedAmbiguousUsers`. Signed-in user usage is reported in `bySource.users` but is never counted against the allowance. Usage records are kept for 90 days after their last write, so periods further back return nothing.
 
 | Code | Description |
 | --- | --- |
@@ -115,7 +115,7 @@ The maximum date range is 366 days. When both `from` and `to` are omitted the de
 | 401 | Missing or invalid credentials |
 | 403 | Caller is not a workspace owner or admin, or the workspace is outside the API key's organization scope |
 | 404 | Workspace not found or deleted |
-| 422 | Invalid date format or date range exceeds 366 days |
+| 422 | Invalid date format or date range exceeds 90 days |
 | 503 | Storage or transfer data temporarily unavailable |
 
 ```bash
@@ -144,7 +144,7 @@ Retrieve a usage report for an entire organization. The caller must be an organi
 | `from` | string (query) | No | Start date inclusive, `yyyy-MM-dd` UTC. Defaults to the first day of the current UTC month. |
 | `to` | string (query) | No | End date inclusive, `yyyy-MM-dd` UTC. Defaults to today in UTC. |
 
-The maximum date range is 366 days. When both `from` and `to` are omitted the default period is the current UTC calendar month to date.
+The maximum date range is 90 days. When both `from` and `to` are omitted the default period is the current UTC calendar month to date.
 
 The response shape is the same as the workspace route. `scope.type` is `"organization"` and all usage across the organization's workspaces is aggregated.
 
@@ -154,7 +154,7 @@ The response shape is the same as the workspace route. `scope.type` is `"organiz
 | 401 | Missing or invalid credentials |
 | 403 | Caller is not an organization admin, or the organization is outside the API key's organization scope |
 | 404 | Organization not found |
-| 422 | Invalid date format or date range exceeds 366 days |
+| 422 | Invalid date format or date range exceeds 90 days |
 | 503 | Storage or transfer data temporarily unavailable |
 
 ```bash
@@ -174,5 +174,5 @@ curl "https://data.spuree.com/api/v1/organizations/{organizationId}/usage-report
 | 401 | Missing or invalid credentials | Refresh the token or check the API key |
 | 403 | Insufficient role or scope | The caller needs workspace owner/admin or organization admin; for API keys the target must be within the key's organization scope |
 | 404 | Workspace or organization not found | Verify the id |
-| 422 | Invalid period | Check date format (`yyyy-MM-dd`) and ensure the range is at most 366 days |
+| 422 | Invalid period | Check date format (`yyyy-MM-dd`) and ensure the range is at most 90 days |
 | 503 | S3 report read failed | Storage or transfer figures are temporarily unavailable; retry later |
