@@ -14,7 +14,7 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 | Claude Code (CLI / desktop) | ✅ via claude.ai | ✅ | Add the connector on claude.ai; it flows into Claude Code automatically |
 | Claude Code on the web & Claude Cowork | ✅ | ◐ | Connector recommended, configured at the Claude account level; Cowork can also install Agent Skills, but the connector keeps API keys out of the client |
 | ChatGPT (web) | ✅ search & video | — | Custom MCP servers depend on your ChatGPT plan and workspace settings; uses its own server URL (see [ChatGPT](#chatgpt)); exposes `search`, `fetch`, `getting_started` and the video tools — no brands, uploads or posts |
-| Codex (CLI / IDE) | — | ✅ | Codex's MCP OAuth login isn't compatible with Spuree's OAuth server today |
+| Codex (CLI / IDE / ChatGPT desktop app) | ✅ | ✅ | `codex mcp add` must pin the pre-registered `openai-codex` client id (see [Codex](#codex-openai-codex-cli--ide-extension)); the Codex tab in the ChatGPT desktop app shares the same configuration |
 | OpenClaw | — | ✅ | OpenClaw's MCP OAuth relies on dynamic client registration, which Spuree's OAuth server doesn't offer, and OpenClaw documents no way to pin a pre-registered client id |
 | Hermes Agent (CLI / desktop) | ✅ | ✅ | The server entry must pin the pre-registered `hermes-agent` client id (see [Hermes Agent](#hermes-agent)) |
 
@@ -71,7 +71,25 @@ Try it: ask *"How do I use Spuree?"* — this runs the `getting_started` tool �
 
 ### Codex (OpenAI Codex CLI / IDE extension)
 
-The connector path is not available for Codex today (Codex's MCP OAuth login requires dynamic client registration, which Spuree's OAuth server doesn't offer). Use skills + an API key:
+Codex runs as the CLI and as the Codex tab in the ChatGPT desktop app; both read the same configuration. Add the connector with Codex's pre-registered client id, or install skills with an API key. Codex cloud uses an environment secret (see below).
+
+**Connector path (recommended):**
+
+1. In a terminal, add Spuree as a streamable HTTP MCP server with the pre-registered client id: `codex mcp add spuree --url https://studio.spuree.com/mcp --oauth-client-id openai-codex`. The `--oauth-client-id openai-codex` flag is required — without it Codex attempts dynamic client registration, which Spuree's OAuth server doesn't offer. Codex prints the callback it will use, `http://127.0.0.1/callback`; that address is already registered for this client id, so there is nothing to add on Spuree's side. Needs Codex CLI 0.147 or newer (`codex --version`).
+2. Sign in. Codex usually starts the browser flow right after the add; if it only says to log in, run `codex mcp login spuree`. Your browser opens Spuree's consent screen listing four scopes (see [Using the connector](#using-the-connector)). Click **Allow** — `render` is what lets Codex start paid work for you, such as a brand memory build or a video.
+3. Start a new Codex session — MCP configuration is read at startup, so an existing session won't see the server. In the ChatGPT desktop app, open **Settings › MCP servers** from the Codex tab, click **Restart**, then **Authenticate** if Spuree asks.
+4. Verify: ask *"List my Spuree projects"*. Codex should call the Spuree connector tools and show your projects. No API key is needed on this path.
+
+**ChatGPT desktop app:** the app's own form adds the server as a plugin, which its Codex tab loads under the same `openai-codex` client:
+
+1. In the ChatGPT desktop app, click **Plugins** in the sidebar, then **Add** › **Add custom MCP server**.
+2. Name it **Spuree**, paste the server URL `https://studio.spuree.com/mcp`, and keep Authentication on **OAuth**.
+3. Open **Advanced OAuth settings**, keep **User-Defined OAuth Client**, paste the client id `openai-codex` and leave the secret blank.
+4. Tick **I understand and want to continue** and click **Create as a plugin**.
+5. ChatGPT shows **Connect Spuree**; click **Continue to Spuree**, sign in when ChatGPT opens Spuree, and click **Allow access** on the **OpenAI Codex** consent screen (the name the ChatGPT app and the Codex CLI share).
+6. Start a new chat in the **Codex** tab so it loads the plugin.
+
+**Skills + API key path:** works without the connector and is what a Codex cloud workspace uses.
 
 1. Create a Spuree account at [studio.spuree.com](https://studio.spuree.com), then create an API key at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys). **Save it immediately — it's shown only once.**
 2. In your project repository, install the skill docs: `npx skills add https://github.com/CheehooLabs/SpureeSkills -a codex` (or choose Codex when prompted; requires Node.js 18+ — `skills` is the open-source skills CLI, fetched on demand by npx). The CLI prompts for the target — project-level `.agents/skills/` is the safest choice — then confirm the files landed: `ls .agents/skills/`. Re-run the same command to update.
@@ -249,6 +267,8 @@ If your projects come back as JSON, you're connected.
 | `403 insufficient_scope` | The token lacks a required scope | Revoke at [studio.spuree.com/account/connections](https://studio.spuree.com/account/connections), then reconnect to re-consent to the full scope set |
 | Spuree missing from `/mcp` in Claude Code | Session isn't authenticated with a claude.ai subscription login | Run `/status`; connectors don't load when `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `apiKeyHelper`, Bedrock/Vertex, or a setup token is active |
 | *"does not support dynamic client registration"* when direct-adding in Claude Code | Spuree's OAuth server has no dynamic client registration | Add Spuree on claude.ai instead ([claude.ai/customize/connectors](https://claude.ai/customize/connectors)) and let it flow into Claude Code |
+| `codex mcp add` or `codex mcp login` fails with *"does not support dynamic client registration"* or *"Invalid registration response"* | The server was added without `--oauth-client-id openai-codex`, so Codex tried to register itself | Remove the entry (`codex mcp remove spuree`), re-run the add command with the flag, then log in again |
+| Codex: the consent screen never appears and Codex reports a redirect URI that does not match a registered URI | An older Codex that minted a per-server callback path, or a `mcp_oauth_callback_url` override on `localhost` instead of the IP literal | Upgrade Codex to 0.147 or newer, drop the `mcp_oauth_callback_url` override (or point it at `http://127.0.0.1/callback`), then log in again |
 | No **Add custom MCP server** option in ChatGPT Plugins | You may be signed out, using a different workspace, or restricted by workspace settings | Sign in on the web, select the intended workspace, then ask your admin about custom MCP server access if the option is still missing |
 | The ChatGPT plugin exists but is not available in a conversation | Creating or sharing a plugin does not install it for each user | Install the plugin, complete any connection prompts, then select it with an @ mention |
 | Unknown-tool error in ChatGPT for `project_list` etc. | ChatGPT's Spuree surface has only `search`, `fetch`, `getting_started` and the video tools | Use those, or connect Codex or Claude for the full tool set |
