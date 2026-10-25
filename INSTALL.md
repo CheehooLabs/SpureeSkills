@@ -2,12 +2,10 @@
 
 There are two ways to hook an AI tool up to Spuree, and they suit different clients:
 
-- **Connector (OAuth MCP)** — paste a URL into your client, sign in through your browser, and approve access once; from then on your AI tool can work with your Spuree projects directly. (Behind the scenes: MCP is the standard protocol AI tools use to talk to services, and OAuth is the browser sign-in that authorizes it.) No keys to copy, revocable from your Spuree account at any time. Best for hosted and chat-style clients (claude.ai surfaces, ChatGPT). The server URL for Claude surfaces is `https://studio.spuree.com/mcp`; ChatGPT uses its own URL (see [ChatGPT](#chatgpt)).
-- **Skills + API key** — install the [Spuree skill docs](https://github.com/CheehooLabs/SpureeSkills) into your agent and authenticate against the REST API with an API key. Best for CLI agents (Codex, OpenClaw, Hermes, local Claude Code) and for the full V1 API surface, including binary file uploads, which the hosted connector does not offer.
+- **Connector (OAuth MCP)** — paste a URL into your client, sign in through your browser, and approve access once; from then on your AI tool can work with your Spuree projects directly. (Behind the scenes: MCP is the standard protocol AI tools use to talk to services, and OAuth is the browser sign-in that authorizes it.) No keys to copy, revocable from your Spuree account at any time. This is the fuller surface: brand memory, video, image and voiceover generation, posts, feedback and Continued works exist only on the connector, and the **first-post** skill runs over it. The server URL for Claude surfaces is `https://studio.spuree.com/mcp`; ChatGPT uses its own URL (see [ChatGPT](#chatgpt)).
+- **Skills + API key** — install the [Spuree skill docs](https://github.com/CheehooLabs/SpureeSkills) into your agent and authenticate against the REST API with an API key. Best for scripts, automations and CLI agents that cannot complete a browser sign-in (OpenClaw, Codex cloud), and for calling the V1 REST API from your own code. Projects, folders, files, uploads and comments are covered; generation, brands and posts are not, so the first-post skill needs the connector.
 
 **Before you start:** you need a Spuree account — sign up at [studio.spuree.com](https://studio.spuree.com). Three domains appear in this guide: **spuree.com** is the main site, **studio.spuree.com** is the web app (and where the consent screen you'll approve is shown), and **data.spuree.com** is the API host.
-
-> **Note:** The Spuree connector is currently in early access. If the OAuth flow is not yet enabled for your account and your client supports skills (Claude Code, Codex, OpenClaw, Hermes), use the skills + API key path in the meantime. ChatGPT has no skills path — if the connector isn't enabled for your account yet, wait for general availability.
 
 ## Which path should I use?
 
@@ -15,9 +13,9 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 | --- | :---: | :---: | --- |
 | Claude Code (CLI / desktop) | ✅ via claude.ai | ✅ | Add the connector on claude.ai; it flows into Claude Code automatically |
 | Claude Code on the web & Claude Cowork | ✅ | ◐ | Connector recommended, configured at the Claude account level; Cowork can also install Agent Skills, but the connector keeps API keys out of the client |
-| ChatGPT (web) | ✅ read-only | — | Paid plan required; uses its own server URL (see [ChatGPT](#chatgpt)); exposes `search`, `fetch`, and `getting_started` only |
+| ChatGPT (web) | ✅ search & video | — | Custom MCP servers depend on your ChatGPT plan and workspace settings; uses its own server URL (see [ChatGPT](#chatgpt)); exposes `search`, `fetch`, `getting_started` and the video tools — no brands, uploads or posts |
 | Codex (CLI / IDE) | — | ✅ | Codex's MCP OAuth login isn't compatible with Spuree's OAuth server today |
-| OpenClaw | — | ✅ | The Spuree MCP endpoint is OAuth-only; OpenClaw's native MCP client doesn't support OAuth flows |
+| OpenClaw | — | ✅ | OpenClaw's MCP OAuth relies on dynamic client registration, which Spuree's OAuth server doesn't offer, and OpenClaw documents no way to pin a pre-registered client id |
 | Hermes Agent (CLI / desktop) | ✅ | ✅ | The server entry must pin the pre-registered `hermes-agent` client id (see [Hermes Agent](#hermes-agent)) |
 
 ✅ = supported · ◐ = possible but not the recommended path · — = not supported
@@ -33,7 +31,7 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 1. On claude.ai, open **Customize > Connectors** ([claude.ai/customize/connectors](https://claude.ai/customize/connectors)). Pick Spuree from the directory if it's listed, or add it as a custom connector with server URL `https://studio.spuree.com/mcp`, then expand **Advanced settings** and set **OAuth Client ID** to `anthropic-claude-code`, leaving the client secret blank — Spuree's OAuth server has no dynamic client registration, so without the pre-registered id the connection fails. On Team/Enterprise plans, an Owner adds it in **Organization settings > Connectors** first; members then connect individually.
 2. Your browser opens Spuree's consent screen on studio.spuree.com — **Authorize** plus your client's name — listing four scopes (see [Using the connector](#using-the-connector)). Click **Allow**.
 3. In Claude Code, make sure you're logged in with your claude.ai account — run `/status` to check. Connectors do **not** load when your session authenticates via `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, an `apiKeyHelper`, Bedrock/Vertex, or a setup token.
-4. Run `/mcp` — connectors from claude.ai appear with a claude.ai indicator. In the desktop app you can also manage them under **Settings > Connectors**.
+4. Run `/mcp` — connectors from claude.ai appear with a claude.ai indicator. In the desktop app you can also manage them under **Customize > Connectors**.
 5. Verify with a read-only call: ask *"List my Spuree projects"*.
 
 > **Advanced:** You can try adding the server directly with `claude mcp add --transport http spuree https://studio.spuree.com/mcp` and authenticating via `/mcp` or `claude mcp login spuree`. However, Spuree's OAuth server does not support dynamic client registration, so this direct flow may fail with *"does not support dynamic client registration"*. If it does, use the claude.ai connector path above.
@@ -52,20 +50,20 @@ There are two ways to hook an AI tool up to Spuree, and they suit different clie
 4. **Claude Cowork:** no separate setup. Control which connectors are active via the **+** menu in the chat box or the **Customize > Connectors** page.
 5. Verify: ask *"List my Spuree projects"*. Successful responses include `webUrl` links into the Spuree web app.
 
-> Freshly added connectors may not appear in an existing conversation — start a new session. Note that on the hosted connector surface, `file_create` (Markdown, up to 1 MiB) is the only way to write file content; binary uploads require the skills + API key path on a local client. Free claude.ai plans are limited to one custom connector. Cowork can also install Agent Skills, but the connector is the recommended path on these surfaces — it keeps API keys out of the client.
+> Freshly added connectors may not appear in an existing conversation — start a new session. On the hosted connector, `file_create` (Markdown, JSON, CSV, YAML, XML, logs or HTML; up to 1 MiB) writes text files directly. Any other file goes through `file_upload_start`, a PUT of the bytes to the URL it returns, then `file_upload_complete` — the PUT runs in Claude's own sandbox, so it needs code execution with network egress that reaches the upload host. Where egress is blocked (Claude on the web by default), a file up to 64 KB goes through `file_upload_inline` instead. Free claude.ai plans are limited to one custom connector. Cowork can also install Agent Skills, but the connector is the recommended path on these surfaces — it keeps API keys out of the client.
 
 ### ChatGPT
 
-Custom connectors require a paid ChatGPT plan — Plus, Pro, Business/Team, Enterprise, or Edu; they're not available on the free tier. Exact menu naming varies as ChatGPT evolves; on current ChatGPT you may need to enable Developer mode first.
+Adding custom MCP servers depends on your ChatGPT workspace permissions and security settings — sign in on the web first, and if the add option is missing after signing in, check with your workspace admin. Exact menu naming varies as ChatGPT evolves.
 
-1. Open **Settings > Security and login** and enable **Developer mode** (this moved — it used to live under **Settings > Connectors > Advanced**).
-2. Go to **Plugins** (labelled **Connectors** or **Apps** on older builds) and click **+** to create a developer-mode app for a remote MCP server.
-3. Name the connector **Spuree**, paste the server URL `https://studio.spuree.com/mcp/chatgpt`, and leave authentication set to **OAuth**. ChatGPT has its own adapter endpoint — don't use the `https://studio.spuree.com/mcp` URL meant for Claude surfaces.
-4. Open **Advanced OAuth settings** and set **OAuth Client ID** to `openai-chatgpt`, leave the client secret blank, and set **Token endpoint auth method** to `none` — Spuree's OAuth server has no dynamic client registration, so without the pre-registered id the connection fails. Tick **I understand and want to continue** under the custom-MCP-server warning, then click **Create**.
-5. ChatGPT redirects to studio.spuree.com and shows Spuree's **Authorize ChatGPT** consent screen. Click **Allow**. The screen lists all four scopes — approval is all-or-nothing in v1 — but the ChatGPT surface can only ever call its three read-only tools, so the `write`, `invite`, and `render` scopes are never exercised there.
-6. The connector appears in the tool picker — start a new chat, open the **+** menu, choose **Developer mode**, and select **Spuree** for that conversation; existing chats won't see the connector.
+1. Open [ChatGPT Plugins](https://chatgpt.com/plugins), sign in, and select the **+** button, then **Add custom MCP server**.
+2. Name it **Spuree**, add a short description, then under **Connection** choose the public-endpoint option and paste the server URL `https://studio.spuree.com/mcp/chatgpt`. ChatGPT has its own adapter endpoint — don't use the `https://studio.spuree.com/mcp` URL meant for Claude surfaces.
+3. Choose **OAuth** in the Authentication menu. Expand **Advanced OAuth settings**, set **Client ID** to `openai-chatgpt` and leave the client secret empty; if asked for **Token endpoint auth method**, choose `none` — Spuree's OAuth server has no dynamic client registration, so without the pre-registered id the connection fails. Tick **I understand and want to continue** under the custom-MCP-server warning, then click **Create as a plugin**.
+4. When prompted, sign in at studio.spuree.com and review Spuree's **Authorize ChatGPT** consent screen before choosing **Allow**. The screen lists all four scopes — approval is all-or-nothing in v1. Here `read` covers `search`, `fetch`, `getting_started`, the video quote, status, result and pattern-read tools, and `likeness_list`; `render` is used only by `video_generate` and `video_finalize_draft`, which spend credits; `write` and `invite` are never exercised on this surface.
+5. ChatGPT lists the tools it discovered from the server. Confirm you see `search`, `fetch`, `getting_started`, `video_quote`, `video_get_status`, `video_get_result`, `video_pattern_read`, `likeness_list`, `video_generate` and `video_finalize_draft`.
+6. Install the resulting **Spuree** plugin from your personal or workspace plugins. Start a new chat, type **@Spuree**, and select the plugin from the menu before asking it to find a file; existing chats won't see the plugin.
 
-**What you get in ChatGPT:** a read-only surface with exactly three tools — `search` (full-text search with links into Spuree), `fetch` (read a file or list a project/folder's children), and `getting_started` (the onboarding guide). The full `project_*` / `folder_*` / `file_*` tool set is **not** available from ChatGPT, and asking for those tools returns an unknown-tool error.
+**What you get in ChatGPT:** ten tools. `search` (full-text search with links into Spuree), `fetch` (read a file or list a project/folder's children), `getting_started` (the onboarding guide), `video_quote`, `video_get_status`, `video_get_result`, `video_pattern_read` and `likeness_list` use `read`; `video_generate` and `video_finalize_draft` use `render` and spend credits. Brands, uploads, posts and the `project_*` / `folder_*` / `file_*` tool set are **not** available here, so ChatGPT's Chat and Work modes can't make your first post — the ChatGPT desktop app's **Codex** tab, which connects as the `openai-codex` client, has the full tool set and can. Asking Chat for a tool it doesn't have returns an unknown-tool error.
 
 **Skills + API key: not supported** — ChatGPT can't load local skill docs or hold an API key.
 
@@ -88,7 +86,7 @@ The connector path is not available for Codex today (Codex's MCP OAuth login req
 
 ### OpenClaw
 
-The connector path is not available for OpenClaw today: the Spuree MCP endpoint is OAuth-only, and OpenClaw's native MCP client supports only static headers. API keys work **only** against the REST API at data.spuree.com — a static-header MCP config pointed at `https://studio.spuree.com/mcp` cannot work. Use skills + an API key instead.
+The connector path is not available for OpenClaw today: OpenClaw's MCP OAuth (`auth: "oauth"` plus `openclaw mcp login`) relies on dynamic client registration, which Spuree's OAuth server does not offer, and OpenClaw documents no way to pin a pre-registered client id. API keys work **only** against the REST API at data.spuree.com — a static-header MCP config pointed at `https://studio.spuree.com/mcp` cannot work either. Use skills + an API key instead.
 
 Skills are documentation, not MCP tools — nothing new appears in OpenClaw's tool list. The agent calls the REST API directly, so it needs shell/HTTP tooling enabled.
 
@@ -145,18 +143,29 @@ When you connect, studio.spuree.com shows a consent screen — **Authorize** plu
 | `read` | List and read every catalogued resource (projects, files, folders, profile, workspaces) |
 | `write` | Create, update, and permanently delete catalogued resources, including removing teammates from workspaces |
 | `invite` | Manage project invitations and sharing on your behalf, including accepting or declining invitations |
-| `render` | Trigger render jobs on your behalf (separate scope because it consumes paid compute) |
+| `render` | Start paid generation and render jobs on your behalf: videos, images, voiceovers and brand memory builds (a separate scope because it spends credits) |
 
 Two things worth knowing before you click Allow:
 
 - **`write` includes permanent deletion** and removing teammates from workspaces. That wording is deliberate.
-- **`render` is the paid-work scope** — on the connector it lets your agent start a brand memory build and generate a video, the two steps the **first-post** skill prices and confirms with you before spending credits; without it those tools answer `insufficient_scope`.
+- **`render` is the paid scope** — on the connector it gates `brand_build_start`, `video_generate`, `video_finalize_draft`, `image_generate` and `voiceover_generate`, the steps the **first-post** skill prices and confirms with you before spending credits; without it those tools answer `insufficient_scope`.
 
 ### What tools appear
 
-On Claude surfaces, the connector exposes tools grouped by scope — for example `project_list`, `project_browse`, `folder_browse`, `file_search`, `file_read_content`, and `comment_list` (read); `project_create`, `folder_create`, `file_update`, `file_create` (Markdown file creation), and `comment_create` (write); `feedback_create` (write) with `feedback_list` and `feedback_get` (read), which the **report-feedback** skill uses to send the Spuree team a bug report or feedback you approved and to check on it; `project_share` and the `invite_*` tools (invite); and, with `write` and `render` approved, the brand, post and video tools the **first-post** skill drives (`brand_create`, `brand_build_start`, `video_generate`, `post_draft_create` and their companions). Plus `getting_started`, a read-only orientation guide, and `destination_suggest`, which ranks likely save destinations. Many responses include `webUrl` links straight into the Spuree web app.
+On Claude surfaces (and for Codex and Hermes over the same connector), the tools cover the whole product. Call `account_context` first: it says which workspace you are working in and who pays for generations. Then, by what they do:
 
-The exact tool list depends on your client and may grow as new skills ship — ChatGPT sees only `search`, `fetch`, and `getting_started`.
+- **Projects, folders, files and comments:** `project_list`, `project_browse`, `project_create`, `folder_browse`, `folder_create`, `file_search`, `file_read_content`, `file_create` (text files up to 1 MiB), `file_update_content`, `file_upload_start` / `file_upload_complete` (any file), `file_upload_inline` (up to 64 KB), `destination_suggest` (ranks likely save destinations), `comment_list`, `comment_create` and their companions.
+- **Sharing and members:** `project_share`, the `invite_*` tools, `workspace_list_members`, `workspace_add_member`, `workspace_update_member_role`, `workspace_remove_member`.
+- **Brand memory:** `brand_lookup`, `brand_create`, `brand_build_start`, `brand_build_status`, `brand_pending_read`, `brand_pending_commit`.
+- **Video:** `video_quote`, `video_generate`, `video_finalize_draft`, `video_get_status`, `video_get_result`, `video_pattern_read`, `likeness_list`.
+- **Images and voiceovers:** `image_quote`, `image_generate`, `voice_list`, `voiceover_quote`, `voiceover_generate`.
+- **Posts and the first post:** `post_draft_create`, `post_video_attach`, `post_get`, `post_list`, `post_update`, `post_delete`, `first_post_state`, `first_post_approve`, `first_post_example_start` — what the **first-post** skill drives.
+- **Feedback and Continued works:** `feedback_create`, `feedback_list`, `feedback_get`, which the **report-feedback** skill uses to send the Spuree team a bug report or feedback you approved and to check on it; `work_list`, `work_ask`, `work_answer`, `work_task`, `work_task_status`, `work_task_snapshot` for works shared from the Continued app.
+- Plus `getting_started`, a read-only orientation guide. Many responses include `webUrl` links straight into the Spuree web app.
+
+The scope rule: reads, lists, quotes and status checks are `read`; creates, updates, deletes, drafts, uploads, feedback and work requests are `write`; sharing is `invite`; the five paid tools — `brand_build_start`, `video_generate`, `video_finalize_draft`, `image_generate` and `voiceover_generate` — are `render`.
+
+The exact tool list depends on your client and grows as tools ship. ChatGPT's Chat and Work modes see the ten tools listed in the [ChatGPT section](#chatgpt).
 
 ### Good first prompts (Claude surfaces)
 
@@ -181,7 +190,7 @@ A successful first call looks like this (illustrative — your project names and
 ### Revoking access
 
 - **Spuree side (connector):** open [studio.spuree.com/account/connections](https://studio.spuree.com/account/connections), find the connected app, and click **Revoke**. Access is cut within seconds. Tokens are scoped per app, so revoking one connector doesn't affect others. Reconnecting later shows the consent screen again and issues a fresh token.
-- **Client side (connector):** also remove the connector in your client — on claude.ai under **Customize > Connectors**, in ChatGPT under **Settings > Connectors**.
+- **Client side (connector):** also remove the connector in your client — on claude.ai under **Customize > Connectors**, in ChatGPT under **Settings > Plugins** (labelled **Connectors** or **Apps** on older builds).
 - **API keys:** manage and revoke keys at [studio.spuree.com/api-keys](https://studio.spuree.com/api-keys), or via `DELETE https://data.spuree.com/api/v1/api-keys/{key_id}` (JWT Bearer required).
 
 ## Using API keys
@@ -236,12 +245,13 @@ If your projects come back as JSON, you're connected.
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `401 invalid_token` on a connector call | The token expired or was revoked | Reconnect from your client's connector UI (e.g. ChatGPT: **Settings > Connectors > Spuree > Reconnect**) |
+| `401 invalid_token` on a connector call | The token expired or was revoked | Reconnect from your client's connector UI (e.g. ChatGPT: **Settings > Plugins > Spuree > Reconnect**) |
 | `403 insufficient_scope` | The token lacks a required scope | Revoke at [studio.spuree.com/account/connections](https://studio.spuree.com/account/connections), then reconnect to re-consent to the full scope set |
 | Spuree missing from `/mcp` in Claude Code | Session isn't authenticated with a claude.ai subscription login | Run `/status`; connectors don't load when `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `apiKeyHelper`, Bedrock/Vertex, or a setup token is active |
 | *"does not support dynamic client registration"* when direct-adding in Claude Code | Spuree's OAuth server has no dynamic client registration | Add Spuree on claude.ai instead ([claude.ai/customize/connectors](https://claude.ai/customize/connectors)) and let it flow into Claude Code |
-| No way to add a connector in ChatGPT Settings | Free tier (custom connectors need a paid plan), or Developer mode isn't enabled | Upgrade to a paid plan (Plus, Pro, Business/Team, Enterprise, Edu), then enable **Settings > Security and login > Developer mode** (naming varies as ChatGPT evolves) |
-| Unknown-tool error in ChatGPT for `project_list` etc. | ChatGPT's Spuree surface has only `search`, `fetch`, and `getting_started` | Use those three tools; the full tool set is available on Claude surfaces |
+| No **Add custom MCP server** option in ChatGPT Plugins | You may be signed out, using a different workspace, or restricted by workspace settings | Sign in on the web, select the intended workspace, then ask your admin about custom MCP server access if the option is still missing |
+| The ChatGPT plugin exists but is not available in a conversation | Creating or sharing a plugin does not install it for each user | Install the plugin, complete any connection prompts, then select it with an @ mention |
+| Unknown-tool error in ChatGPT for `project_list` etc. | ChatGPT's Spuree surface has only `search`, `fetch`, `getting_started` and the video tools | Use those, or connect Codex or Claude for the full tool set |
 | Connector doesn't appear in an existing conversation | Connectors are picked up at session start | Start a new chat — existing chats won't see the connector |
 | `401` when refreshing a JWT | Refresh tokens are single-use; an old one was reused, or the 30-day refresh token expired | Log in again and store the newest `refresh_token` after every refresh |
 | `POST /v1/api-keys` rejected when sent with `X-API-Key` | Key management requires a JWT Bearer, not an API key | Get a JWT via `/auth/token` (or the SSO flow) first |
