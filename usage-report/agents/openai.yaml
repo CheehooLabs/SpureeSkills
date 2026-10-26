@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spuree Usage Report"
+  short_description: "Retrieve daily usage reports for workspaces and organizations with allowance tracking"
+  default_prompt: "Use $usage-report to check this workspace's API usage for the current month"
