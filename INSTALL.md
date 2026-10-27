@@ -161,12 +161,12 @@ When you connect, studio.spuree.com shows a consent screen — **Authorize** plu
 | `read` | List and read every catalogued resource (projects, files, folders, profile, workspaces) |
 | `write` | Create, update, and permanently delete catalogued resources, including removing teammates from workspaces |
 | `invite` | Manage project invitations and sharing on your behalf, including accepting or declining invitations |
-| `render` | Start paid generation and render jobs on your behalf: videos, images, voiceovers and brand memory builds (a separate scope because it spends credits) |
+| `render` | Start paid generation and render jobs on your behalf: videos, images, voiceovers, music and brand memory builds (a separate scope because it spends credits) |
 
 Two things worth knowing before you click Allow:
 
 - **`write` includes permanent deletion** and removing teammates from workspaces. That wording is deliberate.
-- **`render` is the paid scope** — on the connector it gates `brand_build_start`, `video_generate`, `video_finalize_draft`, `image_generate` and `voiceover_generate`, the steps the **first-post** skill prices and confirms with you before spending credits; without it those tools answer `insufficient_scope`.
+- **`render` is the paid scope** — on the connector it gates `brand_build_start`, `video_generate`, `video_finalize_draft`, `image_generate`, `voiceover_generate` and `music_generate`, the steps the **first-post** skill prices and confirms with you before spending credits; without it those tools answer `insufficient_scope`.
 
 ### What tools appear
 
@@ -176,12 +176,12 @@ On Claude surfaces (and for Codex and Hermes over the same connector), the tools
 - **Sharing and members:** `project_share`, the `invite_*` tools, `workspace_list_members`, `workspace_add_member`, `workspace_update_member_role`, `workspace_remove_member`.
 - **Brand memory:** `brand_lookup`, `brand_create`, `brand_build_start`, `brand_build_status`, `brand_pending_read`, `brand_pending_commit`.
 - **Video:** `video_quote`, `video_generate`, `video_finalize_draft`, `video_get_status`, `video_get_result`, `video_pattern_read`, `likeness_list`.
-- **Images and voiceovers:** `image_quote`, `image_generate`, `voice_list`, `voiceover_quote`, `voiceover_generate`.
+- **Images, voiceovers and music:** `image_quote`, `image_generate`, `voice_list`, `voiceover_quote`, `voiceover_generate`, `music_quote`, `music_generate`.
 - **Posts and the first post:** `post_draft_create`, `post_video_attach`, `post_get`, `post_list`, `post_update`, `post_delete`, `first_post_state`, `first_post_approve`, `first_post_example_start` — what the **first-post** skill drives.
 - **Feedback and Continued works:** `feedback_create`, `feedback_list`, `feedback_get`, which the **report-feedback** skill uses to send the Spuree team a bug report or feedback you approved and to check on it; `work_list`, `work_ask`, `work_answer`, `work_task`, `work_task_status`, `work_task_snapshot` for works shared from the Continued app.
 - Plus `getting_started`, a read-only orientation guide. Many responses include `webUrl` links straight into the Spuree web app.
 
-The scope rule: reads, lists, quotes and status checks are `read`; creates, updates, deletes, drafts, uploads, feedback and work requests are `write`; sharing is `invite`; the five paid tools — `brand_build_start`, `video_generate`, `video_finalize_draft`, `image_generate` and `voiceover_generate` — are `render`.
+The scope rule: reads, lists, quotes and status checks are `read`; creates, updates, deletes, drafts, uploads, feedback and work requests are `write`; sharing is `invite`; the six paid tools — `brand_build_start`, `video_generate`, `video_finalize_draft`, `image_generate`, `voiceover_generate` and `music_generate` — are `render`.
 
 The exact tool list depends on your client and grows as tools ship. ChatGPT's Chat and Work modes see the ten tools listed in the [ChatGPT section](#chatgpt).
 
