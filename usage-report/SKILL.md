@@ -112,6 +112,7 @@ The maximum date range is 90 days. When both `from` and `to` are omitted the def
 | Code | Description |
 | --- | --- |
 | 200 | Usage report returned |
+| 400 | `workspaceId` is not a valid ObjectId (`{"detail": "Invalid workspace id"}`) |
 | 401 | Missing or invalid credentials |
 | 403 | Caller is not a workspace owner or admin, or the workspace is outside the API key's organization scope |
 | 404 | Workspace not found or deleted |
@@ -151,6 +152,7 @@ The response shape is the same as the workspace route. `scope.type` is `"organiz
 | Code | Description |
 | --- | --- |
 | 200 | Usage report returned |
+| 400 | `organizationId` is not a valid ObjectId (`{"detail": "Invalid organization id"}`) |
 | 401 | Missing or invalid credentials |
 | 403 | Caller is not an organization admin, or the organization is outside the API key's organization scope |
 | 404 | Organization not found |
@@ -171,6 +173,7 @@ curl "https://data.spuree.com/api/v1/organizations/{organizationId}/usage-report
 
 | Code | Meaning | Action |
 | --- | --- | --- |
+| 400 | Malformed id | The workspace or organization id is not a valid ObjectId |
 | 401 | Missing or invalid credentials | Refresh the token or check the API key |
 | 403 | Insufficient role or scope | The caller needs workspace owner/admin or organization admin; for API keys the target must be within the key's organization scope |
 | 404 | Workspace or organization not found | Verify the id |
