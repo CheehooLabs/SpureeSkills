@@ -31,6 +31,7 @@ test("covers every public Spuree skill", () => {
     "project-memory",
     "report-feedback",
     "usage-report",
+    "voiceover",
     "workspace-management",
   ]);
 });
