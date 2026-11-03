@@ -25,11 +25,14 @@ test("covers every public Spuree skill", () => {
     "first-post",
     "folder-management",
     "getting-started",
+    "image-generation",
     "music-generation",
     "project-invitation",
     "project-management",
+    "project-memory",
     "report-feedback",
     "usage-report",
+    "voiceover",
     "workspace-management",
   ]);
 });

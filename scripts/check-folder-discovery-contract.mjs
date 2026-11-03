@@ -14,11 +14,14 @@ export const SKILL_FILES = Object.freeze({
   firstPost: "first-post/SKILL.md",
   folder: "folder-management/SKILL.md",
   gettingStarted: "getting-started/SKILL.md",
+  imageGeneration: "image-generation/SKILL.md",
   projectInvitation: "project-invitation/SKILL.md",
   musicGeneration: "music-generation/SKILL.md",
   project: "project-management/SKILL.md",
+  projectMemory: "project-memory/SKILL.md",
   reportFeedback: "report-feedback/SKILL.md",
   usageReport: "usage-report/SKILL.md",
+  voiceover: "voiceover/SKILL.md",
   workspace: "workspace-management/SKILL.md",
 });
 

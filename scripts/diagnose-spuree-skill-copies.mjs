@@ -16,11 +16,14 @@ export const TARGET_SKILLS = Object.freeze([
   "first-post",
   "folder-management",
   "getting-started",
+  "image-generation",
   "music-generation",
   "project-invitation",
   "project-management",
+  "project-memory",
   "report-feedback",
   "usage-report",
+  "voiceover",
   "workspace-management",
 ]);
 
