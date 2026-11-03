@@ -16,6 +16,7 @@ export const TARGET_SKILLS = Object.freeze([
   "first-post",
   "folder-management",
   "getting-started",
+  "music-generation",
   "project-invitation",
   "project-management",
   "report-feedback",
