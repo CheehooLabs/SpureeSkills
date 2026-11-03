@@ -29,6 +29,7 @@ test("covers every public Spuree skill", () => {
     "project-management",
     "report-feedback",
     "usage-report",
+    "voiceover",
     "workspace-management",
   ]);
 });

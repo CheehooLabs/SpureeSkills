@@ -20,6 +20,7 @@ export const TARGET_SKILLS = Object.freeze([
   "project-management",
   "report-feedback",
   "usage-report",
+  "voiceover",
   "workspace-management",
 ]);
 

@@ -18,6 +18,7 @@ export const SKILL_FILES = Object.freeze({
   project: "project-management/SKILL.md",
   reportFeedback: "report-feedback/SKILL.md",
   usageReport: "usage-report/SKILL.md",
+  voiceover: "voiceover/SKILL.md",
   workspace: "workspace-management/SKILL.md",
 });
 
