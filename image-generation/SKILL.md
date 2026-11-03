@@ -30,7 +30,8 @@ Every generation follows these steps, in this order, once per image:
 1. **Quote.** `POST /v1/billing/estimate` with `requestType: "text_to_image"`.
    It charges nothing and needs no workspace.
 2. **Show the price in credits** to the person, together with the folder or
-   project the PNG will be saved in and which workspace pays (see **Who pays**).
+   project the PNG will be saved in and how the charge is routed (see **Who
+   pays**; the folder does not pick the payer).
 3. **Wait for an explicit yes.** A yes covers exactly one image. A second image,
    a different prompt, a different ratio or different references needs a new
    yes. Never treat a general request ("make me some pictures") as approval for

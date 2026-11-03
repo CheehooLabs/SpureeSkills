@@ -56,6 +56,7 @@ test("estimate example carries the literal data.spuree.com base URL and the API 
 test("the folder decides destination and permission, never the payer", () => {
   assert.doesNotMatch(skill, /with it the workspace that pays/);
   assert.doesNotMatch(skill, /which one pays/);
+  assert.doesNotMatch(skill, /which workspace pays/);
   assert.match(skill, /It\ndoes not choose the payer\./);
   assert.match(skill, /the payer can differ from the folder's workspace/);
 });
