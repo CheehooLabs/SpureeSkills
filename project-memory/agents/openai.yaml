@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spuree Project Memory"
+  short_description: "Catch up on a project's shared memory, and save a working session into it after the person's yes"
+  default_prompt: "Use $project-memory to catch me up on this project"
