@@ -40,6 +40,7 @@ Connect Claude Code, Claude Code Web & Cowork, ChatGPT, Codex, or OpenClaw — v
 | [Folder Management](./folder-management/SKILL.md) | Find canonical folders in one bounded call, list recent folders, and create, update, delete, browse, or download folder content |
 | [File Management](./file-management/SKILL.md) | Get, create, upload, update, and delete files with checksum-verified uploads (includes name search) |
 | [File Comments](./file-comment/SKILL.md) | Add, list, resolve, update, and delete review comments on files — anchored to a line range, a video timecode, or a still — with drawings, threaded replies, and @mentions |
+| [Image Generation](./image-generation/SKILL.md) | Generate a still image from a prompt into a folder or project: quote the credits, get the person's yes, generate with a stable `operationId`, recover a lost result without paying twice |
 | [Project Invitations](./project-invitation/SKILL.md) | Manage sharing invitations for non-workspace members |
 | [Project Memory](./project-memory/SKILL.md) | Catch up on a project's shared memory and save a working session into it — preview, the person's yes, begin, upload the kept files, commit — or add one 00 LOG line for work done without a save |
 | [Usage Report](./usage-report/SKILL.md) | Retrieve daily usage reports for a workspace or organization, broken down by API key, MCP client, and user, with allowance tracking |
