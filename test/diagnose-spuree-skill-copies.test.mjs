@@ -27,6 +27,7 @@ test("covers every public Spuree skill", () => {
     "getting-started",
     "project-invitation",
     "project-management",
+    "project-memory",
     "report-feedback",
     "usage-report",
     "workspace-management",
