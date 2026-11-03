@@ -1,6 +1,6 @@
 ---
 name: workspace-management
-description: List the members of a Spuree workspace, add a member with a role (admin, member, guest), change a member's role, or remove a member
+description: Read which workspaces the caller belongs to, their role in each and which workspace pays for new work; list the members of a Spuree workspace, add a member with a role (admin, member, guest), change a member's role, or remove a member
 ---
 
 # Workspace Management
@@ -11,6 +11,7 @@ Spuree is an agent-friendly cloud storage. Every project lives in a **workspace*
 
 Use this skill when an agent needs to:
 
+- Find out which workspaces the caller can work in, their role in each, and which workspace pays for and receives new work
 - See who is in a workspace and what role each person holds
 - Add an existing Spuree user to a workspace with a role
 - Promote or demote a member (for example `member` → `admin`)
@@ -24,12 +25,12 @@ Authorization: Bearer $SPUREE_ACCESS_TOKEN
 
 Or: `X-API-Key: $SPUREE_API_KEY`. See the **authentication** skill.
 
-With an API key, the workspace must belong to one of the organizations the key is scoped to; otherwise every call answers 403.
+With an API key, the workspace must belong to one of the organizations the key is scoped to; otherwise every call answers 403. `GET /v1/me/permissions` is the exception: it answers 200 and leaves out what the key cannot see.
 
 ## Base URL
 
 ```
-https://data.spuree.com/api/v1/workspaces
+https://data.spuree.com/api/v1
 ```
 
 ## Workspace roles
@@ -57,7 +58,7 @@ Who may do what to whom:
 
 `owner` is never granted through this API. To bring in someone who has **no Spuree account yet**, share a project with them (`POST /v1/projects/{projectId}/share`, **project-management** skill): that creates an invitation, and accepting it joins them to the workspace as `member`.
 
-Where to get a `workspaceId`: the auth response's `user.workspaces[].workspaceId` (**authentication** skill) or `GET /v1/projects` (**project-management** skill).
+Where to get a `workspaceId`: `GET /v1/me/permissions` below (`workspaces[].id`, works with an API key), the auth response's `user.workspaces[].workspaceId` (**authentication** skill) or `GET /v1/projects` (**project-management** skill).
 
 ## Member Object
 
@@ -80,6 +81,79 @@ Where to get a `workspaceId`: the auth response's `user.workspaces[].workspaceId
 | `role` | string | `owner`, `admin`, `member`, or `guest` |
 
 ## Endpoints
+
+### GET /v1/me/permissions
+
+Who the caller is, every workspace they hold a seat in with their role there, the organizations those workspaces belong to, and which workspace pays for their generation. Read it once at the start of a session, before creating anything, and again when the person says their workspaces changed. Over the MCP connector the same read is the `account_context` tool, which applies the rules below for you.
+
+No parameters: the credential names the caller. Any role may call it, a guest included.
+
+**Response:**
+
+```json
+{
+  "user": {
+    "id": "64a7b8c9d1e2f3a4b5c6d7e8",
+    "email": "user@example.com",
+    "name": "User Name",
+    "image": null
+  },
+  "organizations": [
+    { "id": "64a7b8c9d1e2f3a4b5c6d7f0", "name": "Acme", "role": "member", "appConfig": { "billingEnabled": true } },
+    { "id": "64a7b8c9d1e2f3a4b5c6d7f3", "name": "Personal", "role": "member", "appConfig": null }
+  ],
+  "workspaces": [
+    { "id": "64a7b8c9d1e2f3a4b5c6d7f1", "name": "Acme Studio", "organizationId": "64a7b8c9d1e2f3a4b5c6d7f0", "role": "member", "isPersonal": false },
+    { "id": "64a7b8c9d1e2f3a4b5c6d7f2", "name": "My Workspace", "organizationId": "64a7b8c9d1e2f3a4b5c6d7f3", "role": "owner", "isPersonal": true }
+  ],
+  "creatorEnabled": true,
+  "timelineEditingEnabled": false,
+  "billingWorkspaceId": "64a7b8c9d1e2f3a4b5c6d7f1"
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `user.id` | string | Caller's user ObjectId |
+| `user.email` | string | Caller's email |
+| `user.name` | string? | Display name; `null` when the account has none |
+| `user.image` | string? | Avatar URL; `null` when the account has none |
+| `organizations[].id` | string | Organization ObjectId |
+| `organizations[].name` | string | Organization name |
+| `organizations[].role` | string? | Caller's role in the organization: `owner`, `admin` or `member`; `null` when the caller reaches the organization only through a workspace in it |
+| `organizations[].appConfig` | object? | The organization's boolean feature switches, or `null` when it has none. Spuree Studio's own; nothing in this skill depends on it |
+| `workspaces[].id` | string | Workspace ObjectId — the `workspaceId` every other endpoint takes |
+| `workspaces[].name` | string | Workspace name |
+| `workspaces[].organizationId` | string | The workspace's organization; its name is in `organizations[]`. A personal workspace has one too, so tell personal from organization workspaces by `isPersonal`, not by this field |
+| `workspaces[].role` | string | Caller's role in the workspace: `owner`, `admin`, `member` or `guest` (see **Workspace roles**) |
+| `workspaces[].isPersonal` | boolean | `true` for the caller's personal workspace (at most one) |
+| `creatorEnabled` | boolean | Whether the caller's account may run Spuree's generation APIs |
+| `timelineEditingEnabled` | boolean | Whether this Spuree deployment has the video timeline editor on; a deployment switch, not a per-user grant |
+| `billingWorkspaceId` | string? | The workspace whose credits pay for the caller's generation, always one of `workspaces[].id`; `null` when unknown |
+
+`workspaces[]` holds every workspace the caller is a member of, in any role. Workspaces in an organization the caller is suspended from, and deleted workspaces, are left out. With an organization-scoped API key, `workspaces[]` and `organizations[]` hold only the key's organizations, and `billingWorkspaceId` is `null` when the paying workspace lies outside them; a key that can see no workspace gets `200` with empty lists, not `403`.
+
+**Which workspace pays, and where new work goes.** The paying workspace is the `workspaces[]` entry whose `id` equals `billingWorkspaceId`. Its `isPersonal` says whose account the person works on: `true` is their own, `false` is an organization's, whose credits and projects the work belongs to. When the paying workspace cannot cover a charge, that one charge falls back to the caller's personal workspace. The caller can create projects and brands in a workspace when their role there is `owner`, `admin` or `member`, not as `guest`. Decide where new work goes from the table, then tell the person which workspace you are using and who pays:
+
+| Case | Where new work goes |
+| --- | --- |
+| The paying workspace is personal | There. Name any other workspace the caller can create in, so they can pick it instead |
+| The paying workspace is an organization's, and it is the only organization workspace the caller can create in | There. Name the personal workspace, and any other workspace they can create in, as alternatives |
+| The paying workspace is an organization's, and the caller can create in more than one organization workspace | Ask which workspace, listing every workspace they can create in |
+| The paying workspace is one the caller cannot create in (a `guest` seat) | Ask which workspace, listing the ones they can create in; when there is none, tell them to ask a workspace owner for the `member` role |
+| `billingWorkspaceId` is `null` | One workspace they can create in: use it. More than one: ask. None: they cannot create projects yet |
+
+| Code | Description |
+| --- | --- |
+| 200 | Memberships returned, also when both lists are empty |
+| 401 | Missing, invalid or expired credentials, or the credential's user account no longer exists |
+
+```bash
+curl "https://data.spuree.com/api/v1/me/permissions" \
+  -H "X-API-Key: $SPUREE_API_KEY"
+```
+
+---
 
 ### GET /v1/workspaces/{workspaceId}/members
 
@@ -173,6 +247,13 @@ curl -X DELETE "https://data.spuree.com/api/v1/workspaces/{workspaceId}/members/
 ```
 
 ## Common Patterns
+
+### Pick the workspace for new work
+
+1. `GET /v1/me/permissions`.
+2. Find the paying workspace: the `workspaces[]` entry whose `id` equals `billingWorkspaceId`.
+3. Apply the **Which workspace pays** table. When it says ask, ask before creating anything.
+4. Pass the chosen workspace's `id` as `workspaceId` to `POST /v1/projects` (**project-management** skill), and tell the person which workspace you used and who pays.
 
 ### Onboard a colleague who already has an account
 
