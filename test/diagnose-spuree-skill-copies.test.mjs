@@ -26,6 +26,7 @@ test("covers every public Spuree skill", () => {
     "folder-management",
     "getting-started",
     "image-generation",
+    "music-generation",
     "project-invitation",
     "project-management",
     "project-memory",

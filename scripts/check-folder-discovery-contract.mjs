@@ -16,6 +16,7 @@ export const SKILL_FILES = Object.freeze({
   gettingStarted: "getting-started/SKILL.md",
   imageGeneration: "image-generation/SKILL.md",
   projectInvitation: "project-invitation/SKILL.md",
+  musicGeneration: "music-generation/SKILL.md",
   project: "project-management/SKILL.md",
   projectMemory: "project-memory/SKILL.md",
   reportFeedback: "report-feedback/SKILL.md",
