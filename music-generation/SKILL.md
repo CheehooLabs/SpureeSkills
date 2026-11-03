@@ -45,8 +45,8 @@ Every clip follows these steps, in this order, once per clip:
    for the model and length you will submit (table above). It charges nothing
    and needs no workspace.
 2. **Show the price in credits** to the person, together with the folder or
-   project the audio will be saved in and which workspace pays (see **Who
-   pays**).
+   project the audio will be saved in and how the charge is routed (see **Who
+   pays**; the folder does not pick the payer).
 3. **Wait for an explicit yes.** A yes covers exactly one clip with that model
    and length. A second clip, a different length or a different model needs a
    new quote and a new yes. Never treat a general request ("make me a few
@@ -104,14 +104,21 @@ credits are charged:
 | The caller is an editor in the project but only a `guest` in its workspace (invited from outside) | Allowed up to the credit limit the project owner set for them; past it, 403 `PROJECT_CREDIT_LIMIT_REACHED`. No limit set means 0 |
 | The folder is not inside a project (for example under an asset) and the caller is a `guest`, or no member at all | 403 `SPEND_NOT_PERMITTED` |
 
-Credits come from the caller's billing workspace when it can cover the price,
-otherwise from their personal workspace, otherwise from the folder's
+The folder decides **where the audio is saved and who may spend there**. It
+does not choose the payer. No request parameter selects the payer either; the
+server routes the charge: the caller's billing workspace when it can cover
+the price, otherwise their personal workspace, otherwise the folder's
 workspace. An API key scoped to organizations that exclude the billing
-workspace's organization charges the folder's workspace directly. When you
-show the price, name the folder or project and say which workspace it belongs
-to; the person chooses the folder, and with it the workspace that pays. If
-the person has several workspaces and has not said which one, ask before you
-quote — do not pick one for them.
+workspace's organization skips that workspace and charges the folder's
+workspace directly. So the payer can differ from the folder's workspace.
+
+When you show the price, name the folder or project and the workspace it
+belongs to, then state the routing in those words: "charged to your billing
+workspace if it covers the price, otherwise your personal workspace, otherwise
+this folder's workspace". `GET /v1/me/permissions` (**workspace-management**)
+tells you the caller's `billingWorkspaceId`; balances decide the rest, and the
+quote does not reveal them. If you cannot tell which workspace will be charged,
+say so and do not name one.
 
 A refused request is never charged. A generation that fails after the debit
 (vendor error, vendor busy) is refunded.
@@ -314,14 +321,16 @@ curl -X POST "https://data.spuree.com/api/v1/music/text-to-music" \
 ## Workflow
 
 1. Confirm with the person which folder or project the clip goes to (find it
-   with **folder-management** or **project-management**) and, if they have
-   several workspaces, which one pays.
+   with **folder-management** or **project-management**). This sets the
+   destination and who may spend there; it does not pick the payer.
 2. Pick the model with them: the default when the length can be approximate,
    `music_v2_5` when it must be exact (and where it is enabled).
 3. `POST /v1/billing/estimate` with the matching `requestType` and, for
    `music_v2_5`, the exact `lengthMs`.
 4. Tell the person: the price in credits, the model and length, the folder,
-   the workspace that pays. Wait for their yes.
+   and the payer routing (billing workspace first, then personal workspace,
+   then the folder's workspace; the payer can differ from the folder's
+   workspace). Wait for their yes.
 5. `POST /v1/music/text-to-music` with the same `model` and `lengthMs`.
 6. On 200, give them `output.fileIds.audio` and the Studio link
    `https://studio.spuree.com/files/{fileId}`; `GET /v1/files/{fileId}` has the

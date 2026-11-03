@@ -53,3 +53,11 @@ test("examples carry the literal data.spuree.com base URL and the API key header
   assert.match(skill, /curl -X POST "https:\/\/data\.spuree\.com\/api\/v1\/music\/text-to-music"/);
   assert.match(skill, /-H "X-API-Key: \$SPUREE_API_KEY"/);
 });
+
+test("the folder decides destination and permission, never the payer", () => {
+  assert.doesNotMatch(skill, /with it the workspace that pays/);
+  assert.doesNotMatch(skill, /which one pays/);
+  assert.match(skill, /It\ndoes not choose the payer\./);
+  assert.match(skill, /the payer can differ from the folder's workspace/);
+  assert.match(skill, /billing workspace when it can cover\nthe price, otherwise their personal workspace, otherwise the folder's\nworkspace/);
+});
