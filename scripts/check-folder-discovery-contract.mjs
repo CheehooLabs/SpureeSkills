@@ -14,6 +14,7 @@ export const SKILL_FILES = Object.freeze({
   firstPost: "first-post/SKILL.md",
   folder: "folder-management/SKILL.md",
   gettingStarted: "getting-started/SKILL.md",
+  imageGeneration: "image-generation/SKILL.md",
   projectInvitation: "project-invitation/SKILL.md",
   project: "project-management/SKILL.md",
   reportFeedback: "report-feedback/SKILL.md",
