@@ -50,8 +50,8 @@ GET …/memory → preview → the person says yes → POST …/memory/saves (be
 ```
 
 1. **Read** (`GET …/memory`) creates nothing and carries everything the preview needs: the current MEMORY with its checksum, the newest LOG rows, who can see the project (`visibleTo`), where files will go (`filesFolder`) or what a first save adds (`firstSaveCreates`), and whether this caller may save now (`canSave`, `savesEnabled`).
-2. **Preview**, one screen: *Saving to* (the project) · *Visible to* (the names in `visibleTo`) · *What happened* · *Decided* · *Next time*, each one line · *Keep* (files to upload, with sizes; "already in the project" for one in `existingCopies`) · *Leave behind* (what stays local) · *Never saved* (secrets) · *Then* (what happens to local files; before a first save, what it adds, e.g. "the first save adds 00 MEMORY, 00 LOG, 00 Sessions and 07 Files; nothing else changes"). If `canSave` is false, show no save preview: when `savesEnabled` is false say saving is switched off right now, otherwise say saving needs edit access from the project owner.
-3. **Yes.** Nothing is written before the person's yes. Wait for it, or apply their changes in plain words and show the preview again. After the yes, do the save in one go — begin, the uploads, commit — without asking again.
+2. **Preview**, one screen: *Saving to* (the project) · *Visible to* (the names in `visibleTo`) · *What happened* · *Decided* · *Next time*, each one line · *Page changes* (what this save does to MEMORY, drafted from the page you just read: quote each line it removes or rewords, then list each line it adds, as a count per section when there are more than five; say "no lines removed" when none are) · *Keep* (files to upload, with sizes; "already in the project" for one in `existingCopies`) · *Leave behind* (what stays local) · *Never saved* (secrets) · *Then* (what happens to local files; before a first save, what it adds, e.g. "the first save adds 00 MEMORY, 00 LOG, 00 Sessions and 07 Files; nothing else changes"). If `canSave` is false, show no save preview: when `savesEnabled` is false say saving is switched off right now, otherwise say saving needs edit access from the project owner.
+3. **Yes.** Nothing is written before the person's yes. Wait for it, or apply their changes in plain words and show the preview again. After the yes, do the save in one go — begin, the uploads, commit — without asking again unless a merge changes what they approved.
 4. **Begin** (`POST …/memory/saves`) is the first call that writes: on a project's first save it adds the `00` items and a files folder, and on every save a dated folder for this save's kept files. It answers `saveId`, the current MEMORY with its checksum and `filesFolder`.
 5. **Upload** each kept file into `filesFolder.id` with the **file-management** three-step flow (`POST /v1/files` → `PUT` → `POST /v1/files/{fileId}/upload/complete`), keeping each file's `fileId`, size and CRC32. See [Uploading the kept files](#uploading-the-kept-files).
 6. **Commit** (`POST …/saves/{saveId}/commit`) verifies every declared file, writes the session note once, adds one LOG row and replaces MEMORY under `expectedMemoryChecksum`. `safeToDeleteLocal` is the server's answer to "may the person delete their local copy now?".
@@ -241,7 +241,7 @@ Unknown fields are refused (422).
 | --- | --- |
 | `saveId` | Pass it to commit. |
 | `createdCore` | The core items this call created; empty when the memory already existed. |
-| `memory` | The MEMORY to merge this session into, and the `checksum` to send as `expectedMemoryChecksum`. If `content` differs from the MEMORY you previewed, someone saved meanwhile: merge your changes into this one. |
+| `memory` | The MEMORY to merge this session into, and the `checksum` to send as `expectedMemoryChecksum`. If `content` differs from the MEMORY you previewed, someone saved meanwhile: merge your changes into this one, and show the person the page changes again if that would remove or reword any other line. |
 | `filesFolder` | Upload this save's kept files here: `POST /v1/files` with `sessionId` = `filesFolder.id`. `parentName` is the top-level `NN Files` folder. |
 | `expiresAt` | 7 days after begin. A save that has not written MEMORY by then is abandoned (its dated folder is removed if it holds nothing) and commit answers 404 `save_not_found`: begin again, upload again, commit. |
 
@@ -295,7 +295,7 @@ Finish a save: verify every declared file (in this save's folder, upload complet
 | --- | --- | --- | --- |
 | `noteTitle` | string | Yes | The session note's title, usually the begin `topic` (1–120 characters, one line). The note is saved as `YYYY-MM-DD {app} · {noteTitle}.md`. |
 | `noteMarkdown` | string | Yes | The session note, written from the conversation — never the raw transcript (up to 200,000 characters). Sections: **Asked** (the key requests, quoted, and any limit they set) · **Done** · **Decided** (who, why) · **Files** (each kept file, linked) · **Open** (waiting on whom) · **Stopped at** (the exact next step). The server prefixes `Saved by {name} in {app} on {date}.` |
-| `memoryMarkdown` | string | Yes | The **whole** new MEMORY page, at most 64 KiB: begin's `memory.content` merged with this session. Merge, don't append: update what changed, remove what this session made untrue, keep other people's lines. Sections: Goal · Status · Client rules · Facts · Decisions · Open items · How we do this; each rule or decision ends with who · date. Add a client rule only after the person said yes to it. |
+| `memoryMarkdown` | string | Yes | The **whole** new MEMORY page, at most 64 KiB: begin's `memory.content` merged with this session, with only the page changes the person approved. Merge, don't append: update what changed, remove what this session made untrue, keep other people's lines. Sections: Goal · Status · Client rules · Facts · Decisions · Open items · How we do this. Keep each client rule word for word unless the person said yes to changing it. Each rule or decision ends with who · date. Each new fact, rule or decision also names its source: the file it came from, or else this session's note title. Add a client rule only after the person said yes to it. |
 | `expectedMemoryChecksum` | string | Yes | The checksum you merged from: `memory.checksum` from begin or from the last commit result, or `details.current.checksum` from a 409 `memory_conflict`. |
 | `logLine` | string | Yes | One line for `00 LOG`: what this session did or decided (1–300 characters, one line). |
 | `files` | array | No | Every file uploaded into this save's folder, once each (up to 200); `[]` when the session kept no files. Each item: `fileId` (string), `size` (integer, the bytes uploaded), `crc32` (optional, the Base64 CRC32 sent as `clientChecksumCRC32`). |
@@ -356,7 +356,7 @@ Unknown fields are refused (422). The MCP connector's `inlineFiles` shortcut is 
 }
 ```
 
-Merge your changes into `details.current.content` (keep both people's lines), then commit again with a **new** key, the same `saveId`, note and files, the merged MEMORY and `details.current.checksum` as `expectedMemoryChecksum`.
+Merge your changes into `details.current.content` (keep both people's lines), show the person the page changes again if that would remove or reword any other line, then commit again with a **new** key, the same `saveId`, note and files, the merged MEMORY and `details.current.checksum` as `expectedMemoryChecksum`.
 
 | Code | Description |
 | --- | --- |

@@ -29,6 +29,14 @@ test("keeps the consent gate: nothing is written before the person's yes", () =>
   assert.match(skill, /Call it only after the person said yes to the preview/);
 });
 
+test("makes the person's yes cover what the save does to the MEMORY page", () => {
+  assert.match(skill, /\*Page changes\* \(what this save does to MEMORY.*quote each line it removes or rewords/);
+  assert.match(skill, /with only the page changes the person approved/);
+  assert.match(skill, /show the person the page changes again if that would remove or reword any other line/);
+  assert.match(skill, /Keep each client rule word for word unless the person said yes to changing it/);
+  assert.match(skill, /also names its source/);
+});
+
 test("keeps the secrets rule and the safeToDeleteLocal rule", () => {
   assert.match(skill, /Never upload or write down `\.env` files, keys, tokens, passwords or account numbers/);
   assert.match(skill, /`true` only when every declared file verified and MEMORY was written/);
