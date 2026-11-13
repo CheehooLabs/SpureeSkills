@@ -43,6 +43,8 @@ webSafe: true
 
 Retrieve a usage report for a single workspace. The caller must be a workspace owner or admin.
 
+**Query Parameters:**
+
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `from` | string (query) | No | Start date inclusive, `yyyy-MM-dd` UTC. Defaults to the first day of the current UTC month. |
@@ -139,6 +141,8 @@ webSafe: true
 -->
 
 Retrieve a usage report for an entire organization. The caller must be an organization admin.
+
+**Query Parameters:**
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
