@@ -158,6 +158,8 @@ curl -X DELETE "https://data.spuree.com/api/v1/projects/{projectId}" \
 
 List a project's immediate contents — folders, asset entities, and files — as a **single unified `items` list**. Use this after `GET /v1/projects` to start browsing a project's top-level structure; use **folder-management** skill's `GET /v1/sessions/{folderId}/children` to navigate deeper.
 
+**Query Parameters:**
+
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
 | `sortBy` | string | `lastModified` | Sort key: `lastModified` \| `createdDate` \| `name` |
