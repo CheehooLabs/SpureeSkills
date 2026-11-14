@@ -428,7 +428,7 @@ Only users with access to the file can be mentioned; tokens for other users are 
 
 ### Review a File
 
-1. Read the file content (**file-management** skill: `GET /v1/files/{fileId}/content`).
+1. Read the file content (**file-management** skill: `GET /v1/files/{fileId}/content`). Line comments need the file's own lines, so use this flow on a text file, not on the text extracted from a document (`extracted: true`). When a long file comes back in pieces, count `startLine` and `endLine` from the start of the file, not from the start of the piece.
 2. Leave comments on the lines that need work: `POST /v1/files/{fileId}/comments` with `startLine`/`endLine`/`sourceText`.
 3. Share the file link so the author sees the feedback in Studio: `https://studio.spuree.com/files/{fileId}`.
 
