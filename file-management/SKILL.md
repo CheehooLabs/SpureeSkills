@@ -276,19 +276,24 @@ reads two kinds of file:
   PDF returns the text that recognition found for search.
 
 **Whole file or pieces.** A text file up to 256 KiB, read with no parameters,
-comes back whole in `content`, exactly as stored. Every other read returns one
-piece of at most `maxChars` characters: a document, a text file over 256 KiB, or
-any read with `charOffset` or `maxChars`. When `truncated` is `true` there is
+comes back whole in `content`, exactly as stored. A text file over 256 KiB read
+with no parameters answers 413: pass `charOffset` (`0` to start) to read it in
+pieces. A document, and any read with `charOffset` or `maxChars`, returns one
+piece of at most `maxChars` characters. When `truncated` is `true` there is
 more: pass `nextCharOffset` as the next `charOffset`, and stop when
 `nextCharOffset` is `null`. In a piece of a text file every line ending counts
 as one character, so a piece of a file with Windows line endings is not byte
 for byte the stored file.
 
+A piece is not the file. Before replacing a file's content with
+`PUT /v1/files/{fileId}`, read every piece until `nextCharOffset` is `null`, or
+download the file. Sending one piece back as the whole file deletes the rest.
+
 **Query Parameters:**
 
 | Parameter | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `charOffset` | integer | No | `0` | Where to start in the file's text, in characters. Use the previous piece's `nextCharOffset`, or a match's `charOffset` from `GET /v1/search`. Cannot be combined with `page`. |
+| `charOffset` | integer | No | `0` | Where to start in the file's text, in characters. Use the previous piece's `nextCharOffset`, or a match's `charOffset` from `GET /v1/search`. Passing it, even as `0`, asks for a piece, which is how a text file over 256 KiB is read. Cannot be combined with `page`. |
 | `maxChars` | integer | No | `262144` | Most characters to return in one piece, from 1. A larger value is capped at 262144. |
 | `page` | integer | No | - | Read one page of a PDF or one slide of a deck, counted from 1. Cannot be combined with `charOffset`. |
 
@@ -352,14 +357,18 @@ files over 32 MiB, and the original bytes of a document still come from
 | Code | Description |
 | --- | --- |
 | 200 | Text returned, whole or one piece |
-| 413 | File is over 32 MiB, or a PDF over the page limit (see **Page limit** above); the message names the limit. Use `downloadUrl` |
+| 413 | A text file over 256 KiB read with no parameters (pass `charOffset` to read it in pieces), a file over 32 MiB, or a PDF over the page limit (see **Page limit** above); the message names the limit. For the last two, use `downloadUrl` |
 | 415 | Binary or media file, a document with no text to extract (such as a scan with no recognized text), or a text file that is not UTF-8 |
 | 422 | `page` combined with a non-zero `charOffset`, `page` outside 1 to `pageCount`, `page` on a file with no pages or slides (a Word file, an Excel file or a text file), or `maxChars` below 1 |
 | 503 | The read did not complete. Retry once; if it fails again, tell the user |
 
 ```bash
-# Read a file: a text file up to 256 KiB comes back whole, anything else in pieces
+# Read a file: a text file up to 256 KiB comes back whole, a document as its first piece
 curl "https://data.spuree.com/api/v1/files/{fileId}/content" \
+  -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
+
+# Read the first piece of a text file over 256 KiB
+curl "https://data.spuree.com/api/v1/files/{fileId}/content?charOffset=0" \
   -H "Authorization: Bearer $SPUREE_ACCESS_TOKEN"
 
 # Read the next piece
