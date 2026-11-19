@@ -24,6 +24,20 @@ test("documents the four production routes with the literal base URL", () => {
   assert.match(skill, /-H "X-API-Key: \$SPUREE_API_KEY"/);
 });
 
+test("says where the memory lives: one 00 Memory folder, and a top-level memory stays where it is", () => {
+  assert.match(skill, /creates the memory in one `00 Memory` folder at the top of the project/);
+  assert.match(skill, /\*\*A memory that sits at the project's top level stays there\.\*\*/);
+  assert.match(skill, /never build a path to the memory: use the `fileId` and folder `id` values/);
+  assert.match(skill, /No save creates a `00 INDEX`/);
+  assert.match(
+    skill,
+    /"createdCore": \["00 Memory", "00 Memory\/Sessions", "00 Memory\/00 MEMORY\.md", "00 Memory\/00 LOG\.md"\]/,
+  );
+  // The old promises are gone: an INDEX made on demand, a note written "into 00 Sessions".
+  assert.doesNotMatch(skill, /created only when the project has none/);
+  assert.doesNotMatch(skill, /into `00 Sessions`/);
+});
+
 test("keeps the consent gate: nothing is written before the person's yes", () => {
   assert.match(skill, /Nothing is written before the person's yes/);
   assert.match(skill, /Call it only after the person said yes to the preview/);

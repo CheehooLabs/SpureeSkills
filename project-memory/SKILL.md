@@ -7,15 +7,17 @@ description: Catch up on a Spuree project's shared memory and save a working ses
 
 ## Overview
 
-A Spuree project can keep a shared memory that any person's agent picks up later: a one-page `00 MEMORY`, a `00 LOG` with one row per saved session, one note per session in `00 Sessions`, and the files each session kept in a dated folder under a numbered `NN Files` folder. The memory is ordinary project files — people read and edit them in Studio, agents read them with the **file-management** skill — and this skill is the REST path to read it and write it. The first save creates these items; nothing else in the project is moved or renamed.
+A Spuree project can keep a shared memory that any person's agent picks up later: a one-page `00 MEMORY`, a `00 LOG` with one row per saved session, one note per saved session, and the files each session kept in a dated folder. The memory is ordinary project files — people read and edit them in Studio, agents read them with the **file-management** skill — and this skill is the REST path to read it and write it. The first save creates the memory in one `00 Memory` folder at the top of the project; nothing else in the project is moved or renamed.
 
 | Item | What it is |
 | --- | --- |
-| `00 MEMORY.md` | One page: goal, status, client rules, facts, decisions, open items, how we do this. Replaced on every save under its checksum. |
-| `00 LOG.md` | One table row per saved session (or LOG-only append), newest first: `\| Date \| App \| Who \| What happened \| Note \|`. |
-| `00 Sessions/` | One note per saved session, never edited after it is written. |
-| `00 INDEX.md` | A short map for agents; created only when the project has none. |
-| `NN Files/` | The top-level files folder (`01 Files` in an unnumbered project, else the next free number). Each save that keeps files gets a dated sub-folder named `YYYY-MM-DD {topic}`. |
+| `00 Memory/` | The folder the memory lives in: the one item a first save adds to the project's top level. |
+| `00 Memory/00 MEMORY.md` | One page: goal, status, client rules, facts, decisions, open items, how we do this. Replaced on every save under its checksum. |
+| `00 Memory/00 LOG.md` | One table row per saved session (or LOG-only append), newest first: `\| Date \| App \| Who \| What happened \| Note \|`. |
+| `00 Memory/Sessions/` | One note per saved session, never edited after it is written. |
+| `00 Memory/Files/` | Each save that keeps files gets a dated sub-folder here named `YYYY-MM-DD {topic}`. The `Files` folder is there only while a save keeps (or has kept) files. |
+
+**A memory that sits at the project's top level stays there.** A project whose memory was made earlier, or by hand, keeps `00 MEMORY.md`, `00 LOG.md`, `00 Sessions/` and a numbered `NN Files/` (sometimes a `00 INDEX.md`) at its top level; a save adds only what is missing beside them and never moves or renames anything. The same holds for a memory a person moved into another folder. So never build a path to the memory: use the `fileId` and folder `id` values these endpoints answer. No save creates a `00 INDEX`.
 
 Use this skill when an agent needs to:
 
@@ -50,9 +52,9 @@ GET …/memory → preview → the person says yes → POST …/memory/saves (be
 ```
 
 1. **Read** (`GET …/memory`) creates nothing and carries everything the preview needs: the current MEMORY with its checksum, the newest LOG rows, who can see the project (`visibleTo`), where files will go (`filesFolder`) or what a first save adds (`firstSaveCreates`), and whether this caller may save now (`canSave`, `savesEnabled`).
-2. **Preview**, one screen: *Saving to* (the project) · *Visible to* (the names in `visibleTo`) · *What happened* · *Decided* · *Next time*, each one line · *Page changes* (what this save does to MEMORY, drafted from the page you just read: quote each line it removes or rewords, then list each line it adds, as a count per section when there are more than five; say "no lines removed" when none are) · *Keep* (files to upload, with sizes; "already in the project" for one in `existingCopies`) · *Leave behind* (what stays local) · *Never saved* (secrets) · *Then* (what happens to local files; before a first save, what it adds, e.g. "the first save adds 00 MEMORY, 00 LOG, 00 Sessions and 07 Files; nothing else changes"). If `canSave` is false, show no save preview: when `savesEnabled` is false say saving is switched off right now, otherwise say saving needs edit access from the project owner.
+2. **Preview**, one screen: *Saving to* (the project) · *Visible to* (the names in `visibleTo`) · *What happened* · *Decided* · *Next time*, each one line · *Page changes* (what this save does to MEMORY, drafted from the page you just read: quote each line it removes or rewords, then list each line it adds, as a count per section when there are more than five; say "no lines removed" when none are) · *Keep* (files to upload, with sizes; "already in the project" for one in `existingCopies`) · *Leave behind* (what stays local) · *Never saved* (secrets) · *Then* (what happens to local files; before a first save, what it adds, e.g. "the first save adds one 00 Memory folder with Sessions, 00 MEMORY.md and 00 LOG.md inside; nothing else changes"). If `canSave` is false, show no save preview: when `savesEnabled` is false say saving is switched off right now, otherwise say saving needs edit access from the project owner.
 3. **Yes.** Nothing is written before the person's yes. Wait for it, or apply their changes in plain words and show the preview again. After the yes, do the save in one go — begin, the uploads, commit — without asking again unless a merge changes what they approved.
-4. **Begin** (`POST …/memory/saves`) is the first call that writes: on a project's first save it adds the `00` items and a files folder, and on every save a dated folder for this save's kept files. It answers `saveId`, the current MEMORY with its checksum and `filesFolder`.
+4. **Begin** (`POST …/memory/saves`) is the first call that writes: on a project's first save it adds the `00 Memory` folder and the items in it (or, where the memory already sits at the top level, only the missing items beside it), and on every save a dated folder for this save's kept files. It answers `saveId`, the current MEMORY with its checksum and `filesFolder`.
 5. **Upload** each kept file into `filesFolder.id` with the **file-management** three-step flow (`POST /v1/files` → `PUT` → `POST /v1/files/{fileId}/upload/complete`), keeping each file's `fileId`, size and CRC32. See [Uploading the kept files](#uploading-the-kept-files).
 6. **Commit** (`POST …/saves/{saveId}/commit`) verifies every declared file, writes the session note once, adds one LOG row and replaces MEMORY under `expectedMemoryChecksum`. `safeToDeleteLocal` is the server's answer to "may the person delete their local copy now?".
 
@@ -140,7 +142,7 @@ Read the project's memory: the catch-up and the save preview in one call. Read a
   "lastSave": { "at": "2026-10-27T18:04:11Z", "by": "Alex Chen", "app": "Claude Code" },
   "filesFolder": {
     "id": "6ae0a1b2c3d4e5f6000000c3",
-    "name": "01 Files",
+    "name": "Files",
     "webUrl": "https://studio.spuree.com/folders/6ae0a1b2c3d4e5f6000000c3"
   },
   "existingCopies": [
@@ -160,13 +162,13 @@ Read the project's memory: the catch-up and the save preview in one call. Read a
 | `canSave` | The caller has edit access **and** saves are switched on: begin would not refuse. |
 | `savesEnabled` | Saves are switched on in this environment. When `false`, nothing can be saved; reading still works. |
 | `visibleTo` | The owner and everyone the project is shared with: `name`, `role` (`owner`, `admin`, `editor`, `commenter` or `viewer`) and `email` — the email only for a caller with edit access, `null` for a commenter or viewer. |
-| `firstSaveCreates` | What the first save will add — only `00` items and one `NN Files` folder, e.g. `["00 Sessions", "07 Files", "00 MEMORY.md", "00 LOG.md"]`. Existing items with those name prefixes are adopted and left out. Empty once the memory exists. |
+| `firstSaveCreates` | What the first save will add: one `00 Memory` folder and the items in it, `["00 Memory", "00 Memory/Sessions", "00 Memory/00 MEMORY.md", "00 Memory/00 LOG.md"]`. In a project that already keeps `00` memory items at its top level it is the missing ones beside them instead, e.g. `["00 Sessions", "07 Files", "00 LOG.md"]`. Existing items with those name prefixes are adopted and left out. Empty once the memory exists. |
 | `memory` | The current `00 MEMORY`: `content` (the whole page) and `checksum` (the file's checksum; pass it back as `expectedMemoryChecksum` on commit). |
 | `recentLog` | Up to 5 `00 LOG` table rows, newest first, as raw Markdown rows (the standard header and rule lines removed; a hand-made LOG adopted by prefix may still show its own header row). |
-| `sessions` | Up to 5 session notes from `00 Sessions`, newest first. |
+| `sessions` | Up to 5 session notes, newest first. |
 | `filesSinceLastSave` | Up to 20 files added anywhere in the project after the last save, newest first, with the folder they sit in — "what is new" for the catch-up. |
 | `lastSave` | When the newest save wrote MEMORY, by whom (display name) and in which app; `null` before the first save. |
-| `filesFolder` | The top-level `NN Files` folder where saves put their dated sub-folders; `null` before the first save. |
+| `filesFolder` | The folder where saves put their dated sub-folders: `Files` inside `00 Memory`, or the numbered `NN Files` of a memory at the top level. `null` before the first save and, inside `00 Memory`, until a save keeps files; begin always answers the folder to upload into. |
 | `existingCopies` | Only when `keepChecksums` was given: for each requested checksum that matches live, completed files anywhere in the project, up to 5 of them. Checksums with no match are left out. |
 
 `webUrl` fields are permanent, permission-aware Studio links (`https://studio.spuree.com/files/{fileId}`, `https://studio.spuree.com/folders/{folderId}`); pass them on as given.
@@ -201,7 +203,7 @@ surfaces: ["local", "desktop", "backend", "hosted-web"]
 webSafe: true
 -->
 
-Begin a save. **Call it only after the person said yes to the preview built from `GET …/memory`** — this is the first call that writes. On a project's first save it creates the memory (only the `00` items listed in `firstSaveCreates` and a files folder; nothing moves), and on every save a dated folder for this save's kept files. It answers the current MEMORY with its checksum, the newest LOG rows and who can see the project. Edit access.
+Begin a save. **Call it only after the person said yes to the preview built from `GET …/memory`** — this is the first call that writes. On a project's first save it creates the memory (the items listed in `firstSaveCreates` and a files folder; nothing moves), and on every save a dated folder for this save's kept files. It answers the current MEMORY with its checksum, the newest LOG rows and who can see the project. Edit access.
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -216,7 +218,7 @@ Unknown fields are refused (422).
 {
   "saveId": "6ae0a1b2c3d4e5f6000000e1",
   "projectId": "6ae0a1b2c3d4e5f60000001a",
-  "createdCore": ["00 MEMORY.md", "00 LOG.md", "00 Sessions", "00 INDEX.md"],
+  "createdCore": ["00 Memory", "00 Memory/Sessions", "00 Memory/00 MEMORY.md", "00 Memory/00 LOG.md"],
   "memory": {
     "fileId": "6ae0a1b2c3d4e5f6000000a1",
     "content": "# Acme Bakery — memory\n\n…",
@@ -227,7 +229,7 @@ Unknown fields are refused (422).
   "filesFolder": {
     "id": "6ae0a1b2c3d4e5f6000000c9",
     "name": "2026-10-27 October menu video",
-    "parentName": "01 Files",
+    "parentName": "Files",
     "webUrl": "https://studio.spuree.com/folders/6ae0a1b2c3d4e5f6000000c9"
   },
   "visibleTo": [
@@ -240,9 +242,9 @@ Unknown fields are refused (422).
 | Field | Description |
 | --- | --- |
 | `saveId` | Pass it to commit. |
-| `createdCore` | The core items this call created; empty when the memory already existed. |
+| `createdCore` | The core items this call created, as `firstSaveCreates` listed them; empty when the memory already existed. |
 | `memory` | The MEMORY to merge this session into, and the `checksum` to send as `expectedMemoryChecksum`. If `content` differs from the MEMORY you previewed, someone saved meanwhile: merge your changes into this one, and show the person the page changes again if that would remove or reword any other line. |
-| `filesFolder` | Upload this save's kept files here: `POST /v1/files` with `sessionId` = `filesFolder.id`. `parentName` is the top-level `NN Files` folder. |
+| `filesFolder` | Upload this save's kept files here: `POST /v1/files` with `sessionId` = `filesFolder.id`. `parentName` is the files folder it sits in: `Files`, or a numbered `NN Files` for a memory at the top level. |
 | `expiresAt` | 7 days after begin. A save that has not written MEMORY by then is abandoned (its dated folder is removed if it holds nothing) and commit answers 404 `save_not_found`: begin again, upload again, commit. |
 
 A retry with the same `Idempotency-Key` and the same body answers the same save with `Idempotency-Replayed: true`.
@@ -289,7 +291,7 @@ surfaces: ["local", "desktop", "backend", "hosted-web"]
 webSafe: true
 -->
 
-Finish a save: verify every declared file (in this save's folder, upload complete, size and CRC32 match), write the session note into `00 Sessions` once, add one row to `00 LOG` and replace `00 MEMORY` when `expectedMemoryChecksum` still matches. Edit access; the save must be the caller's own.
+Finish a save: verify every declared file (in this save's folder, upload complete, size and CRC32 match), write the session note once, add one row to `00 LOG` and replace `00 MEMORY` when `expectedMemoryChecksum` still matches. Edit access; the save must be the caller's own.
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -396,7 +398,7 @@ surfaces: ["local", "desktop", "backend", "hosted-web"]
 webSafe: true
 -->
 
-Add one row to the top of `00 LOG` without a save: work another agent or person did in the project — an edit, a check, a hand-off — so the next catch-up sees it. No note is written and MEMORY does not change; the next save folds the work in. A project with no memory gets **only** `00 LOG.md` (`created: true`; an existing `00 LOG…` file is adopted), and `GET …/memory` then shows the row in `recentLog` with `exists` still `false`. Edit access. It needs no yes from the person, but name who did the work in `actor`.
+Add one row to the top of `00 LOG` without a save: work another agent or person did in the project — an edit, a check, a hand-off — so the next catch-up sees it. No note is written and MEMORY does not change; the next save folds the work in. A project with no memory gets **only** `00 LOG.md`, in a `00 Memory` folder made for it (`created: true`; an existing `00 LOG…` file is adopted where it is), and `GET …/memory` then shows the row in `recentLog` with `exists` still `false`. Edit access. It needs no yes from the person, but name who did the work in `actor`.
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
